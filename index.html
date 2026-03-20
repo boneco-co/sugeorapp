@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="수거앱">
+<meta name="theme-color" content="#1a56db">
+<title>수거 작업 앱</title>
+
+<!-- 카카오맵 SDK -->
+<script type="text/javascript"
+  src="//dapi.kakao.com/v2/maps/sdk.js?appkey=b8908c96799936ef733a0445f1bd6abc&libraries=services,clusterer">
+</script>
+
+<style>
+:root {
+  --blue:#1a56db; --blue-l:#e8f0fe;
+  --red:#dc2626;  --red-l:#fee2e2;
+  --yellow:#d97706; --yellow-l:#fef3c7;
+  --green:#16a34a;  --green-l:#dcfce7;
+  --gray:#6b7280;   --gray-l:#f3f4f6;
+  --text:#111827;   --text2:#6b7280;
+  --white:#fff;     --bg:#f0f4f8;
+  --border:#e5e7eb;
+  --font:'Noto Sans KR',-apple-system,sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;overflow:hidden;font-family:var(--font);background:var(--bg);color:var(--text);}
+.app{display:flex;flex-direction:column;height:100vh;height:100dvh;}
+
+/* ── 헤더 ── */
+.header{
+  background:var(--blue);
+  padding:max(14px,env(safe-area-inset-top)) 16px 10px;
+  flex-shrink:0;
+}
+.header-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.header-title{font-size:20px;font-weight:700;color:#fff;}
+.header-date{font-size:12px;color:rgba(255,255,255,.75);}
+.stats{display:flex;gap:8px;}
+.stat{background:rgba(255,255,255,.15);border-radius:10px;padding:5px 12px;text-align:center;}
+.stat-n{font-size:20px;font-weight:900;color:#fff;line-height:1;}
+.stat-l{font-size:10px;color:rgba(255,255,255,.8);margin-top:1px;}
+
+/* ── 필터 버튼 ── */
+.filter-bar{display:flex;gap:7px;padding:0 0 2px;}
+.fb{
+  flex:1;padding:12px 6px;border-radius:12px;border:2px solid rgba(255,255,255,.3);
+  background:rgba(255,255,255,.1);font-family:var(--font);font-size:15px;font-weight:700;
+  color:rgba(255,255,255,.8);cursor:pointer;text-align:center;
+  display:flex;flex-direction:column;align-items:center;gap:3px;transition:all .15s;
+}
+.fb .fi{font-size:22px;}
+.fb.on-all   {background:#fff;border-color:#fff;color:var(--blue);}
+.fb.on-heavy {background:var(--red);border-color:var(--red);color:#fff;}
+.fb.on-light {background:var(--green);border-color:var(--green);color:#fff;}
+.fb:active{transform:scale(.96);}
+
+/* ── 탭 ── */
+.tabs{display:flex;background:var(--white);border-bottom:1px solid var(--border);flex-shrink:0;}
+.tab{flex:1;padding:12px;text-align:center;font-size:15px;font-weight:600;color:var(--gray);border-bottom:3px solid transparent;cursor:pointer;}
+.tab.on{color:var(--blue);border-bottom-color:var(--blue);}
+
+/* ── 콘텐츠 ── */
+.content{flex:1;overflow:hidden;display:flex;flex-direction:column;}
+.screen{display:none;flex:1;flex-direction:column;overflow:hidden;}
+.screen.on{display:flex;}
+
+/* ── 목록 ── */
+.job-list{flex:1;overflow-y:auto;padding:10px;-webkit-overflow-scrolling:touch;}
+.job-list::-webkit-scrollbar{display:none;}
+
+.sec-hdr{display:flex;align-items:center;gap:8px;padding:8px 4px 5px;margin-top:4px;}
+.sec-hdr:first-child{margin-top:0;}
+.sec-badge{font-size:13px;font-weight:700;padding:4px 12px;border-radius:20px;}
+.sb-red   {background:var(--red-l);color:var(--red);}
+.sb-yellow{background:var(--yellow-l);color:var(--yellow);}
+.sb-green {background:var(--green-l);color:var(--green);}
+.sb-gray  {background:var(--gray-l);color:var(--gray);}
+.sec-cnt{font-size:12px;color:var(--text2);}
+
+/* ── 작업 카드 ── */
+.jc{background:var(--white);border-radius:16px;margin-bottom:10px;border:2px solid var(--border);overflow:hidden;}
+.jc.ga{border-left:6px solid var(--red);}
+.jc.gb{border-left:6px solid var(--yellow);}
+.jc.gc{border-left:6px solid var(--green);}
+.jc.rollover{border-left:6px solid var(--red);background:#fff8f8;}
+.jc.done{opacity:.5;}
+
+.jc-body{padding:15px 15px 12px;}
+.jc-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;}
+.jc-seq{font-size:12px;color:var(--text2);font-weight:600;}
+.grade-tag{font-size:11px;padding:3px 10px;border-radius:20px;font-weight:700;}
+.gta{background:var(--red-l);color:var(--red);}
+.gtb{background:var(--yellow-l);color:var(--yellow);}
+.gtc{background:var(--green-l);color:var(--green);}
+.rollover-tag{background:var(--red-l);color:var(--red);font-size:11px;padding:3px 10px;border-radius:20px;font-weight:700;}
+
+.jc-name{font-size:22px;font-weight:900;margin-bottom:3px;}
+.jc-item{font-size:17px;font-weight:700;color:var(--blue);margin-bottom:6px;}
+.jc-addr{font-size:15px;color:var(--text2);line-height:1.5;margin-bottom:8px;}
+.jc-memo{background:var(--gray-l);border-radius:8px;padding:8px 12px;font-size:14px;color:var(--text2);margin-bottom:10px;line-height:1.5;}
+.jc-rollover-info{background:var(--red-l);border-radius:8px;padding:8px 12px;font-size:13px;color:var(--red);font-weight:600;margin-bottom:10px;}
+
+/* 길찾기 버튼 */
+.navi-btn{
+  width:100%;padding:16px;border-radius:12px;border:none;
+  background:var(--blue);color:#fff;font-family:var(--font);
+  font-size:18px;font-weight:700;cursor:pointer;margin-bottom:8px;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+}
+.navi-btn:active{background:#1344b8;transform:scale(.98);}
+
+/* 결과 버튼 */
+.res-btns{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;}
+.rb{
+  padding:14px 6px;border-radius:12px;border:2px solid;
+  font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;gap:4px;
+  transition:all .15s;user-select:none;-webkit-user-select:none;
+  position:relative;overflow:hidden;
+}
+.rb .ri{font-size:22px;}
+.rb-done   {background:var(--green-l);border-color:var(--green);color:var(--green);}
+.rb-partial{background:var(--yellow-l);border-color:var(--yellow);color:var(--yellow);}
+.rb-absent {background:var(--red-l);border-color:var(--red);color:var(--red);}
+.rb-delay  {background:var(--gray-l);border-color:var(--gray);color:var(--gray);}
+.rb .pp{position:absolute;bottom:0;left:0;height:4px;background:currentColor;width:0%;transition:width 2s linear;opacity:.5;}
+.rb.pressing .pp{width:100%;}
+
+/* 완료뱃지 */
+.done-badge{background:var(--green-l);border-radius:10px;padding:12px;text-align:center;font-size:16px;font-weight:700;color:var(--green);}
+
+/* ── 지도 ── */
+.map-wrap{flex:1;position:relative;}
+#kakao-map{width:100%;height:100%;}
+.map-legend{
+  position:absolute;bottom:16px;left:12px;
+  background:rgba(255,255,255,.95);border-radius:12px;padding:10px 14px;
+  box-shadow:0 2px 12px rgba(0,0,0,.15);font-size:13px;z-index:10;
+}
+.lg-row{display:flex;align-items:center;gap:8px;margin-bottom:5px;}
+.lg-row:last-child{margin-bottom:0;}
+.lg-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0;}
+.map-filter-info{
+  position:absolute;top:12px;left:50%;transform:translateX(-50%);
+  background:rgba(0,0,0,.7);color:#fff;border-radius:20px;
+  padding:6px 16px;font-size:13px;font-weight:600;z-index:10;
+  display:none;white-space:nowrap;
+}
+.map-filter-info.on{display:block;}
+
+/* ── 모달 ── */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:500;
+  display:none;align-items:flex-end;justify-content:center;
+  backdrop-filter:blur(4px);
+}
+.modal-overlay.on{display:flex;animation:su .25s ease;}
+@keyframes su{from{transform:translateY(40px);opacity:0}to{transform:translateY(0);opacity:1}}
+.modal-sheet{
+  background:var(--white);border-radius:24px 24px 0 0;width:100%;
+  max-height:85vh;overflow-y:auto;
+  padding:20px 16px max(32px,env(safe-area-inset-bottom));
+}
+.modal-handle{width:40px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px;}
+.modal-title{font-size:20px;font-weight:700;margin-bottom:5px;}
+.modal-item{font-size:15px;color:var(--blue);font-weight:600;margin-bottom:14px;}
+
+/* 사진 촬영 */
+.photo-zone{
+  border:3px dashed var(--border);border-radius:16px;padding:22px;
+  text-align:center;margin-bottom:14px;cursor:pointer;background:var(--gray-l);
+}
+.photo-zone.ok{border-color:var(--green);border-style:solid;background:var(--green-l);}
+.pz-icon{font-size:36px;margin-bottom:6px;}
+.pz-text{font-size:16px;font-weight:700;color:var(--text2);}
+.pz-sub{font-size:13px;color:var(--text2);margin-top:3px;}
+.thumbs{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;justify-content:center;}
+.thumb{width:68px;height:68px;border-radius:10px;background:var(--white);border:2px solid var(--green);display:flex;align-items:center;justify-content:center;font-size:26px;}
+
+/* 이월 모달 */
+.delay-info{background:var(--yellow-l);border-radius:12px;padding:14px;margin-bottom:14px;}
+.delay-info .di-title{font-size:14px;font-weight:700;color:var(--yellow);margin-bottom:6px;}
+.delay-info .di-date{font-size:22px;font-weight:900;color:var(--yellow);}
+.delay-info .di-reason{font-size:12px;color:var(--yellow);margin-top:4px;opacity:.8;}
+
+/* 경고 */
+.warn{background:var(--red-l);border-radius:10px;padding:10px 14px;font-size:14px;color:var(--red);font-weight:600;margin-bottom:12px;display:none;}
+.warn.on{display:block;}
+
+/* 확정 버튼 */
+.confirm-btn{
+  width:100%;padding:17px;border-radius:14px;border:none;
+  font-family:var(--font);font-size:17px;font-weight:700;cursor:pointer;margin-top:6px;
+}
+.cb-partial{background:var(--yellow);color:#fff;}
+.cb-absent {background:var(--red);color:#fff;}
+.cb-delay  {background:var(--gray);color:#fff;}
+.confirm-btn:disabled{opacity:.4;cursor:not-allowed;}
+
+/* 토스트 */
+.toast{
+  position:fixed;bottom:80px;left:50%;transform:translateX(-50%);
+  background:#111827;color:#fff;padding:12px 20px;border-radius:12px;
+  font-size:15px;font-weight:600;z-index:999;display:none;
+  white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,.3);
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- 헤더 -->
+  <div class="header">
+    <div class="header-top">
+      <div>
+        <div class="header-title">🚛 오늘 수거 작업</div>
+        <div class="header-date" id="hdr-date"></div>
+      </div>
+      <div class="stats">
+        <div class="stat"><div class="stat-n" id="s-remain">0</div><div class="stat-l">남은 건</div></div>
+        <div class="stat"><div class="stat-n" id="s-done">0</div><div class="stat-l">완료</div></div>
+      </div>
+    </div>
+    <div class="filter-bar">
+      <button class="fb on-all"   id="fb-all"   onclick="setFilter('all')"><span class="fi">📋</span>전체보기</button>
+      <button class="fb"          id="fb-heavy" onclick="setFilter('heavy')"><span class="fi">🧊</span>무거운 것</button>
+      <button class="fb"          id="fb-light" onclick="setFilter('light')"><span class="fi">🪑</span>가벼운 것</button>
+    </div>
+  </div>
+
+  <!-- 탭 -->
+  <div class="tabs">
+    <div class="tab on" id="tab-list" onclick="goTab('list')">📋 목록</div>
+    <div class="tab"    id="tab-map"  onclick="goTab('map')">🗺 지도</div>
+  </div>
+
+  <div class="content">
+    <!-- 목록 -->
+    <div class="screen on" id="sc-list">
+      <div class="job-list" id="job-list"></div>
+    </div>
+
+    <!-- 지도 -->
+    <div class="screen" id="sc-map">
+      <div class="map-wrap">
+        <div id="kakao-map"></div>
+        <div class="map-filter-info" id="map-filter-info"></div>
+        <div class="map-legend">
+          <div class="lg-row"><div class="lg-dot" style="background:#dc2626"></div> 무거운 것 (대형)</div>
+          <div class="lg-row"><div class="lg-dot" style="background:#d97706"></div> 중간</div>
+          <div class="lg-row"><div class="lg-dot" style="background:#16a34a"></div> 가벼운 것</div>
+          <div class="lg-row"><div class="lg-dot" style="background:#7c3aed"></div> 이월 건</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 부분수거 모달 -->
+<div class="modal-overlay" id="mo-partial">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">📦 일부만 있음</div>
+    <div class="modal-item" id="mp-item"></div>
+    <div class="photo-zone" id="mp-zone" onclick="takePhoto('partial')">
+      <div class="pz-icon">📷</div>
+      <div class="pz-text">현장 사진 촬영 (필수)</div>
+      <div class="pz-sub">탭하여 사진 찍기</div>
+      <div class="thumbs" id="mp-thumbs"></div>
+    </div>
+    <div class="warn" id="mp-warn">📸 사진을 먼저 찍어주세요</div>
+    <button class="confirm-btn cb-partial" onclick="confirmModal('partial')">📦 일부 수거 확정 → 사무실 전송</button>
+  </div>
+</div>
+
+<!-- 물건없음 모달 -->
+<div class="modal-overlay" id="mo-absent">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">❌ 물건이 없음</div>
+    <div class="modal-item" id="ma-item"></div>
+    <div style="background:var(--red-l);border-radius:12px;padding:12px;font-size:14px;color:var(--red);margin-bottom:14px;line-height:1.6;">
+      현장 바닥/장소를 찍어주세요.<br>사무실에 바로 전송됩니다.
+    </div>
+    <div class="photo-zone" id="ma-zone" onclick="takePhoto('absent')">
+      <div class="pz-icon">📷</div>
+      <div class="pz-text">현장 증빙 사진 (필수)</div>
+      <div class="pz-sub">탭하여 촬영</div>
+      <div class="thumbs" id="ma-thumbs"></div>
+    </div>
+    <div class="warn" id="ma-warn">📸 사진을 먼저 찍어주세요</div>
+    <button class="confirm-btn cb-absent" onclick="confirmModal('absent')">❌ 물건 없음 확정 → 사무실 전송</button>
+  </div>
+</div>
+
+<!-- 이월 모달 -->
+<div class="modal-overlay" id="mo-delay">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">📅 내일로 미루기</div>
+    <div class="modal-item" id="md-item"></div>
+    <div class="delay-info">
+      <div class="di-title">다음 수거 예정일</div>
+      <div class="di-date" id="md-date">-</div>
+      <div class="di-reason" id="md-reason"></div>
+    </div>
+    <div style="font-size:14px;color:var(--text2);line-height:1.7;margin-bottom:14px;">
+      위 날짜로 자동 이월됩니다.<br>사무실 캘린더에 바로 반영됩니다.
+    </div>
+    <button class="confirm-btn cb-delay" onclick="confirmModal('delay')">📅 이월 확정</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════════════
+// 설정값 (사무실에서 Google Sheets로 제어)
+// ══════════════════════════════════════════════════════
+const CONFIG = {
+  holidayWork: false,           // 공휴일 근무 여부 (사무실에서 ON/OFF)
+  holidays: ['2026-03-01','2026-05-05','2026-06-06'], // 공휴일 목록
+  jamsil5Days: [1],             // 잠실5단지 수거 요일 (1=월요일)
+  wrongAreas: ['엘스','리센츠','갤러리아팰리스','파크리오','아시아선수촌'], // 오접수 필터
+};
+
+// ══════════════════════════════════════════════════════
+// 품목 등급 DB
+// ══════════════════════════════════════════════════════
+const GRADE_A = ['냉장고','매트리스','안마의자','장롱','소파','보일러','세탁기','에어컨','피아노','금고','물탱크','침대어린이2층','침대돌옥황토','올갠','어항'];
+const GRADE_C = ['의자','이불','행거','커튼','자전거','유모차','가방','빨래건조대','아이스박스','컬러박스','액자','장판','카페트','블라인드','선풍기','청소기','프린터','가습기','킥보드','텐트','화분','소화기','도마','베개','방석','인형','장난감'];
+
+function getGrade(item) {
+  const n = item.replace(/\s/g,'');
+  if(GRADE_A.some(k=>n.includes(k))) return 'A';
+  if(GRADE_C.some(k=>n.includes(k))) return 'C';
+  return 'B';
+}
+
+// ══════════════════════════════════════════════════════
+// 수거일 연산 엔진
+// ══════════════════════════════════════════════════════
+function isHoliday(d) {
+  return CONFIG.holidays.includes(fmt(d));
+}
+
+function isWorkday(d) {
+  const dow = d.getDay();
+  if(dow === 0) return false; // 일요일
+  if(isHoliday(d) && !CONFIG.holidayWork) return false;
+  return true;
+}
+
+function nextWorkday(from, skipDays=1) {
+  const d = new Date(from);
+  d.setDate(d.getDate() + skipDays);
+  while(!isWorkday(d)) d.setDate(d.getDate()+1);
+  return d;
+}
+
+function calcDelayDate(job) {
+  const today = new Date();
+  const addr = job.addr;
+
+  // 잠실 5단지 → 다음 월요일
+  if(addr.includes('5단지') || addr.includes('주공')) {
+    const d = new Date(today);
+    d.setDate(d.getDate()+1);
+    while(d.getDay() !== 1) d.setDate(d.getDate()+1);
+    // 해당 월요일이 공휴일이면 다음 주 월요일
+    while(!isWorkday(d)) d.setDate(d.getDate()+7);
+    return {date:d, reason:'잠실주공 5단지 — 월요일 수거 원칙 적용'};
+  }
+
+  // 일반 지역 → 다음 근무일
+  const next = nextWorkday(today, 1);
+  const dow = today.getDay();
+  let reason = '익일 수거';
+  if(dow === 5) reason = '금요일 → 월요일 이월 (일요일 휴무)';
+  if(dow === 6) reason = '토요일 → 월요일 이월';
+  return {date:next, reason};
+}
+
+function fmt(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function fmtKr(d) {
+  const days = ['일','월','화','수','목','금','토'];
+  return `${d.getMonth()+1}월 ${d.getDate()}일 (${days[d.getDay()]}요일)`;
+}
+
+// ══════════════════════════════════════════════════════
+// 실제 데이터 (Google Sheets에서 받아오면 교체)
+// ══════════════════════════════════════════════════════
+// 오접수 필터 적용 — 잘못된 구역은 자동 제외
+const RAW_JOBS = [
+  {id:'001',name:'김영희',phone:'010-1111-2222',addr:'잠실동 88-3',    item:'냉장고 300L이상',  amount:7000, memo:'1층 분리수거장 앞',  lat:37.5107,lng:127.0810,rollover:false},
+  {id:'002',name:'이민수',phone:'010-9876-5432',addr:'삼전동 126-1',   item:'매트리스 2인용',   amount:8000, memo:'현관문 앞',           lat:37.5063,lng:127.0899,rollover:false},
+  {id:'003',name:'박지영',phone:'010-5555-7777',addr:'잠실본동 296-2', item:'소파 4인용',        amount:13000,memo:'',                   lat:37.5091,lng:127.0875,rollover:false},
+  {id:'004',name:'김철호',phone:'010-2222-8888',addr:'잠실주공5단지 515동',item:'안마의자',      amount:10000,memo:'경비실에 맡겨뒀음',   lat:37.5140,lng:127.0797,rollover:true},  // 이월건
+  {id:'005',name:'최수연',phone:'010-3333-9999',addr:'문정동 150-22',  item:'TV 42인치이상',    amount:7000, memo:'',                   lat:37.4916,lng:127.1228,rollover:false},
+  {id:'006',name:'정대한',phone:'010-7777-1111',addr:'삼전동 94-2',    item:'장롱 100cm이상',   amount:15000,memo:'3층 엘리베이터 있음', lat:37.5072,lng:127.0911,rollover:false},
+  {id:'007',name:'홍길동',phone:'010-1234-5678',addr:'방이동 88-3',    item:'의자 1인용',        amount:2000, memo:'',                   lat:37.5149,lng:127.1055,rollover:false},
+  {id:'008',name:'강민준',phone:'010-1111-2233',addr:'삼전동 94-2',    item:'세탁기 10kg이상',  amount:4000, memo:'베란다에 있음',        lat:37.5071,lng:127.0912,rollover:false},
+  {id:'009',name:'이서연',phone:'010-3344-5566',addr:'잠실본동 191',   item:'이불 겨울용',       amount:2000, memo:'쓰레기 배출장소',      lat:37.5104,lng:127.0862,rollover:false},
+  // 오접수 건 — 잘못된 구역 (기사앱에 안 뜸)
+  {id:'X01',name:'오접수테스트',phone:'010-0000-0000',addr:'엘스 101동',item:'소파',amount:5000,memo:'',lat:37.514,lng:127.060,rollover:false},
+];
+
+// 오접수 필터링
+const JOBS = RAW_JOBS
+  .filter(j => !CONFIG.wrongAreas.some(kw => j.addr.includes(kw)))
+  .map(j => ({...j, grade:getGrade(j.item), done:false, result:null}));
+
+// ══════════════════════════════════════════════════════
+// 상태
+// ══════════════════════════════════════════════════════
+let filter = 'all';
+let tab    = 'list';
+let curJob = null;
+let curModal = null;
+let photos = {partial:[], absent:[]};
+let pressTimer = null;
+let kakaoMap = null;
+let markers = [];
+
+// ══════════════════════════════════════════════════════
+// 초기화
+// ══════════════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', () => {
+  const d = new Date();
+  document.getElementById('hdr-date').textContent =
+    d.toLocaleDateString('ko-KR',{month:'long',day:'numeric',weekday:'short'});
+  renderJobs();
+  updateStats();
+  document.querySelectorAll('.modal-overlay').forEach(m => {
+    m.addEventListener('click', e => { if(e.target===m) closeModal(); });
+  });
+});
+
+// ══════════════════════════════════════════════════════
+// 카카오맵 초기화
+// ══════════════════════════════════════════════════════
+function initMap() {
+  if(kakaoMap) { renderMarkers(); return; }
+  const container = document.getElementById('kakao-map');
+  const options = {
+    center: new kakao.maps.LatLng(37.5091, 127.0875),
+    level: 4
+  };
+  kakaoMap = new kakao.maps.Map(container, options);
+  renderMarkers();
+}
+
+function renderMarkers() {
+  // 기존 마커 제거
+  markers.forEach(m => m.setMap(null));
+  markers = [];
+
+  const list = filteredJobs();
+  const colorMap = {A:'#dc2626', B:'#d97706', C:'#16a34a'};
+
+  list.forEach(job => {
+    if(job.done) return;
+    const color = job.rollover ? '#7c3aed' : colorMap[job.grade];
+    const size = job.grade==='A' ? 14 : job.grade==='B' ? 11 : 9;
+
+    const markerContent = `
+      <div style="
+        width:${size*2+4}px;height:${size*2+4}px;
+        background:${color};border:3px solid #fff;
+        border-radius:50%;cursor:pointer;
+        box-shadow:0 2px 8px rgba(0,0,0,.3);
+        display:flex;align-items:center;justify-content:center;
+        font-size:${size-2}px;color:#fff;font-weight:700;
+        ${job.rollover?'animation:pulse 1.5s infinite;':''}
+      ">${job.grade}</div>`;
+
+    const marker = new kakao.maps.CustomOverlay({
+      position: new kakao.maps.LatLng(job.lat, job.lng),
+      content: markerContent,
+      yAnchor: 1
+    });
+    marker.setMap(kakaoMap);
+    markers.push(marker);
+
+    // 클릭 시 목록 탭으로 이동
+    marker.getContent().addEventListener('click', () => {
+      goTab('list');
+      setTimeout(() => {
+        const el = document.getElementById(`jc-${job.id}`);
+        if(el) el.scrollIntoView({behavior:'smooth',block:'center'});
+      }, 200);
+    });
+  });
+
+  // 지도 범위 조정
+  if(list.length > 0) {
+    const bounds = new kakao.maps.LatLngBounds();
+    list.forEach(j => bounds.extend(new kakao.maps.LatLng(j.lat, j.lng)));
+    kakaoMap.setBounds(bounds);
+  }
+}
+
+// ══════════════════════════════════════════════════════
+// 필터
+// ══════════════════════════════════════════════════════
+function setFilter(f) {
+  filter = f;
+  document.getElementById('fb-all').className   = 'fb' + (f==='all'   ?' on-all':'');
+  document.getElementById('fb-heavy').className = 'fb' + (f==='heavy' ?' on-heavy':'');
+  document.getElementById('fb-light').className = 'fb' + (f==='light' ?' on-light':'');
+
+  const info = document.getElementById('map-filter-info');
+  if(f==='heavy'){info.textContent='🧊 무거운 것만 표시 중';info.classList.add('on');}
+  else if(f==='light'){info.textContent='🪑 가벼운 것만 표시 중';info.classList.add('on');}
+  else info.classList.remove('on');
+
+  renderJobs();
+  if(kakaoMap) renderMarkers();
+}
+
+function filteredJobs() {
+  const active = JOBS.filter(j=>!j.done);
+  if(filter==='heavy') return active.filter(j=>j.grade==='A');
+  if(filter==='light') return active.filter(j=>j.grade==='C');
+  return active;
+}
+
+// ══════════════════════════════════════════════════════
+// 목록 렌더
+// ══════════════════════════════════════════════════════
+const GL = {A:'🧊 무거운 것', B:'📦 중간', C:'🪑 가벼운 것'};
+const GT = {A:'gta', B:'gtb', C:'gtc'};
+const GC = {A:'ga', B:'gb', C:'gc'};
+
+function renderJobs() {
+  const el = document.getElementById('job-list');
+  const list = filteredJobs();
+  const done = JOBS.filter(j=>j.done);
+
+  if(!list.length && !done.length) {
+    el.innerHTML = `<div style="text-align:center;padding:60px 20px;">
+      <div style="font-size:48px;margin-bottom:12px">🎉</div>
+      <div style="font-size:22px;font-weight:700;color:var(--green)">오늘 작업 완료!</div>
+    </div>`; return;
+  }
+
+  let html = '';
+
+  // 필터 안내
+  if(filter==='heavy') html += `<div style="background:var(--red-l);border-radius:12px;padding:12px 16px;margin-bottom:10px;font-size:14px;font-weight:600;color:var(--red);">🧊 무거운 것만 — 먼저 차에 실을 품목</div>`;
+  else if(filter==='light') html += `<div style="background:var(--green-l);border-radius:12px;padding:12px 16px;margin-bottom:10px;font-size:14px;font-weight:600;color:var(--green);">🪑 가벼운 것만 — 빈 자리에 나중에 실을 품목</div>`;
+
+  // 이월건 먼저
+  const rollovers = list.filter(j=>j.rollover);
+  const normal    = list.filter(j=>!j.rollover);
+
+  if(rollovers.length) {
+    html += `<div class="sec-hdr"><span class="sec-badge sb-red">🔴 이월 건 (우선 처리)</span><span class="sec-cnt">${rollovers.length}건</span></div>`;
+    html += rollovers.map((j,i)=>cardHTML(j,i+1)).join('');
+  }
+
+  if(filter==='all' && normal.length) {
+    const ga=normal.filter(j=>j.grade==='A');
+    const gb=normal.filter(j=>j.grade==='B');
+    const gc=normal.filter(j=>j.grade==='C');
+    let seq=rollovers.length+1;
+    if(ga.length){html+=`<div class="sec-hdr"><span class="sec-badge sb-red">🧊 먼저 실을 것</span><span class="sec-cnt">${ga.length}건</span></div>`;html+=ga.map((j,i)=>cardHTML(j,seq+i)).join('');seq+=ga.length;}
+    if(gb.length){html+=`<div class="sec-hdr"><span class="sec-badge sb-yellow">📦 중간</span><span class="sec-cnt">${gb.length}건</span></div>`;html+=gb.map((j,i)=>cardHTML(j,seq+i)).join('');seq+=gb.length;}
+    if(gc.length){html+=`<div class="sec-hdr"><span class="sec-badge sb-green">🪑 나중에 실을 것</span><span class="sec-cnt">${gc.length}건</span></div>`;html+=gc.map((j,i)=>cardHTML(j,seq+i)).join('');}
+  } else {
+    html += normal.map((j,i)=>cardHTML(j,rollovers.length+i+1)).join('');
+  }
+
+  if(done.length) {
+    html += `<div class="sec-hdr" style="margin-top:14px;"><span class="sec-badge sb-gray">✅ 완료 ${done.length}건</span></div>`;
+    html += done.map(j=>`
+      <div class="jc done ${GC[j.grade]}">
+        <div class="jc-body">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div class="jc-name" style="font-size:18px">${j.name}</div>
+            <div class="done-badge" style="padding:5px 12px;font-size:13px">
+              ${j.result==='complete'?'✅ 완료':j.result==='partial'?'📦 일부':j.result==='absent'?'❌ 없음':'📅 이월'}
+            </div>
+          </div>
+          <div class="jc-item">${j.item}</div>
+          <div class="jc-addr">📍 ${j.addr}</div>
+        </div>
+      </div>`).join('');
+  }
+
+  el.innerHTML = html;
+}
+
+function cardHTML(j, seq) {
+  const cardCls = j.rollover ? 'rollover' : GC[j.grade];
+  const tagHtml = j.rollover
+    ? `<span class="rollover-tag">🔴 이월</span>`
+    : `<span class="grade-tag ${GT[j.grade]}">${GL[j.grade]}</span>`;
+
+  return `
+  <div class="jc ${cardCls}" id="jc-${j.id}">
+    <div class="jc-body">
+      <div class="jc-top"><div class="jc-seq">#${seq}</div>${tagHtml}</div>
+      <div class="jc-name">${j.name}</div>
+      <div class="jc-item">${j.item}</div>
+      <div class="jc-addr">📍 ${j.addr}</div>
+      ${j.rollover?`<div class="jc-rollover-info">🔴 이월 건 — 오늘 우선 수거 필요</div>`:''}
+      ${j.memo?`<div class="jc-memo">💬 ${j.memo}</div>`:''}
+
+      <button class="navi-btn" onclick="openNavi('${j.id}')">
+        🗺 카카오맵으로 길찾기
+      </button>
+
+      <div class="res-btns">
+        <button class="rb rb-done"
+          onpointerdown="startPress('${j.id}',this)"
+          onpointerup="cancelPress()"
+          onpointerleave="cancelPress()">
+          <span class="ri">✅</span><span>완료</span>
+          <span style="font-size:11px;opacity:.7">2초 길게</span>
+          <div class="pp"></div>
+        </button>
+        <button class="rb rb-partial" onclick="openModal('${j.id}','partial')">
+          <span class="ri">📦</span><span>일부만</span><span style="font-size:11px;opacity:.7">있음</span>
+          <div class="pp"></div>
+        </button>
+        <button class="rb rb-absent" onclick="openModal('${j.id}','absent')">
+          <span class="ri">❌</span><span>물건</span><span style="font-size:11px;opacity:.7">없음</span>
+          <div class="pp"></div>
+        </button>
+      </div>
+      <button class="rb rb-delay" style="width:100%;margin-top:7px;flex-direction:row;gap:8px;padding:13px;" onclick="openModal('${j.id}','delay')">
+        <span style="font-size:18px">📅</span><span style="font-size:14px">내일로 미루기</span>
+      </button>
+    </div>
+  </div>`;
+}
+
+// ══════════════════════════════════════════════════════
+// 길찾기
+// ══════════════════════════════════════════════════════
+function openNavi(id) {
+  const j = JOBS.find(x=>x.id===id);
+  if(!j) return;
+  const addr = encodeURIComponent(j.addr);
+  window.location = `kakaomap://search?q=${addr}`;
+  setTimeout(() => window.open(`https://map.kakao.com/?q=${addr}`,'_blank'), 1500);
+}
+
+// ══════════════════════════════════════════════════════
+// 길게 누르기 — 완료
+// ══════════════════════════════════════════════════════
+function startPress(id, btn) {
+  if(pressTimer) cancelPress();
+  btn.classList.add('pressing');
+  pressTimer = setTimeout(() => {
+    btn.classList.remove('pressing');
+    markDone(id,'complete');
+  }, 2000);
+}
+function cancelPress() {
+  if(pressTimer){clearTimeout(pressTimer);pressTimer=null;}
+  document.querySelectorAll('.rb.pressing').forEach(b=>b.classList.remove('pressing'));
+}
+
+function markDone(id, result) {
+  const j = JOBS.find(x=>x.id===id);
+  if(!j) return;
+  j.done=true; j.result=result;
+  const msg = result==='complete'?`✅ ${j.name}님 수거 완료!`
+            : result==='partial' ?`📦 ${j.name}님 일부 수거 전송됨`
+            : result==='absent'  ?`❌ ${j.name}님 물건없음 전송됨`
+            :                     `📅 ${j.name}님 이월 처리됨`;
+  showToast(msg);
+  renderJobs(); updateStats();
+  if(kakaoMap) renderMarkers();
+}
+
+// ══════════════════════════════════════════════════════
+// 모달
+// ══════════════════════════════════════════════════════
+function openModal(id, type) {
+  curJob=id; curModal=type;
+  photos={partial:[],absent:[]};
+  const j=JOBS.find(x=>x.id===id);
+
+  if(type==='partial'){
+    document.getElementById('mp-item').textContent=j.item+' — '+j.addr;
+    document.getElementById('mp-thumbs').innerHTML='';
+    document.getElementById('mp-zone').className='photo-zone';
+    document.getElementById('mp-warn').classList.remove('on');
+    document.getElementById('mo-partial').classList.add('on');
+  } else if(type==='absent'){
+    document.getElementById('ma-item').textContent=j.item+' — '+j.addr;
+    document.getElementById('ma-thumbs').innerHTML='';
+    document.getElementById('ma-zone').className='photo-zone';
+    document.getElementById('ma-warn').classList.remove('on');
+    document.getElementById('mo-absent').classList.add('on');
+  } else if(type==='delay'){
+    document.getElementById('md-item').textContent=j.item+' — '+j.addr;
+    const {date,reason}=calcDelayDate(j);
+    document.getElementById('md-date').textContent=fmtKr(date);
+    document.getElementById('md-reason').textContent=reason;
+    document.getElementById('mo-delay').classList.add('on');
+  }
+}
+
+function closeModal() {
+  ['mo-partial','mo-absent','mo-delay'].forEach(id=>document.getElementById(id).classList.remove('on'));
+  curJob=null; curModal=null;
+}
+
+const EMOJIS=['📸','🖼️','📷','🗃️'];
+function takePhoto(type) {
+  const emoji=EMOJIS[photos[type].length%4];
+  const ts=new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  photos[type].push({emoji,ts});
+  const el=document.getElementById(type==='partial'?'mp-thumbs':'ma-thumbs');
+  const d=document.createElement('div');
+  d.className='thumb';
+  d.innerHTML=`<div style="text-align:center"><div>${emoji}</div><div style="font-size:9px;color:#6b7280">${ts}</div></div>`;
+  el.appendChild(d);
+  const zone=document.getElementById(type==='partial'?'mp-zone':'ma-zone');
+  zone.className='photo-zone ok';
+  zone.querySelector('.pz-text').textContent=`사진 ${photos[type].length}장 촬영됨`;
+  zone.querySelector('.pz-sub').textContent='탭하여 추가 촬영';
+  document.getElementById(type==='partial'?'mp-warn':'ma-warn').classList.remove('on');
+  showToast(`📸 ${photos[type].length}장 저장됨`);
+}
+
+function confirmModal(type) {
+  if((type==='partial'||type==='absent') && photos[type].length===0) {
+    document.getElementById(type==='partial'?'mp-warn':'ma-warn').classList.add('on');
+    return;
+  }
+  const id=curJob; closeModal();
+  markDone(id,type);
+}
+
+// ══════════════════════════════════════════════════════
+// 탭
+// ══════════════════════════════════════════════════════
+function goTab(t) {
+  tab=t;
+  document.getElementById('tab-list').className='tab'+(t==='list'?' on':'');
+  document.getElementById('tab-map').className ='tab'+(t==='map' ?' on':'');
+  document.getElementById('sc-list').className ='screen'+(t==='list'?' on':'');
+  document.getElementById('sc-map').className  ='screen'+(t==='map' ?' on':'');
+  if(t==='map') {
+    // 카카오맵 SDK 로드 확인 후 초기화
+    if(typeof kakao!=='undefined' && kakao.maps) initMap();
+    else setTimeout(initMap, 500);
+  }
+}
+
+// ══════════════════════════════════════════════════════
+// 통계
+// ══════════════════════════════════════════════════════
+function updateStats() {
+  document.getElementById('s-remain').textContent=JOBS.filter(j=>!j.done).length;
+  document.getElementById('s-done').textContent  =JOBS.filter(j=>j.done).length;
+}
+
+// ══════════════════════════════════════════════════════
+// 토스트
+// ══════════════════════════════════════════════════════
+let tt;
+function showToast(msg,dur=2500){
+  const el=document.getElementById('toast');
+  el.textContent=msg;el.style.display='block';
+  clearTimeout(tt);tt=setTimeout(()=>el.style.display='none',dur);
+}
+</script>
+</body>
+</html>
