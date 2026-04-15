@@ -766,7 +766,8 @@ function renderPins(){
   if(clusterer)clusterer.clear();
   const list=filteredJobs();const kakaoMarkers=[];
   list.forEach(job=>{
-    const color=getPinColor(job);
+  if (job.item === '위치확인') return; // 이 줄을 꼭 넣어주세요!
+  const color=getPinColor(job);
     const size=job.grade==='A'?15:job.grade==='B'?12:10;
     const pos=new kakao.maps.LatLng(job.lat,job.lng);
     const mk=new kakao.maps.Marker({position:pos});mk.setMap(null);kakaoMarkers.push(mk);
