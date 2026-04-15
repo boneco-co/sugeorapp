@@ -618,9 +618,8 @@ function goView(v){
 // ══ 리스트 렌더 (동/단지별 그룹) ══
 function renderList(){
   const scroll=document.getElementById('list-scroll');
-  const list=filteredJobs();
-  const done=JOBS.filter(j=>j.done);
-
+  const list = filteredJobs().filter(j => j.item !== '위치확인');
+  const done = JOBS.filter(j => j.done && j.item !== '위치확인');
   // 민원 배너
   const complaints=list.filter(j=>j.complaint);
   const banner=document.getElementById('complaint-banner');
