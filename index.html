@@ -453,6 +453,20 @@ const RAW=[
   {id:'013',name:'박수진',phone:'010-9988-7766',addr:'잠실로 62 트리지움 318동 1203호',item:'소파 2인용',amount:7000,memo:'318동 분리수거장',lat:37.5095,lng:127.0908,rollover:false,source:'빼기',paidDate:'2026-03-19',complaint:false},
   {id:'014',name:'김상원',phone:'010-1122-3344',addr:'잠실로 62 트리지움 325동 601호', item:'냉장고 300L미만',amount:5000,memo:'',      lat:37.5092,lng:127.0905,rollover:false,source:'구청',paidDate:'2026-03-18',complaint:false},
   {id:'015',name:'이현주',phone:'010-5544-3322',addr:'잠실로 88 레이크팰리스 120동 1101호',item:'장롱 100cm이상',amount:15000,memo:'120동 앞 집하장',lat:37.5138,lng:127.0793,rollover:false,source:'견적',paidDate:'2026-03-19',complaint:false},
+  // [트리지움 46개 동]
+  {id:'T301', name:'트리지움 301동', addr:'잠실로 62 트리지움 301동', lat:37.5088, lng:127.0901, item:'수거예정', amount:0, source:'인터넷', paidDate:'2026-04-15', rollover:false, complaint:false},
+  {id:'T302', name:'트리지움 302동', addr:'잠실로 62 트리지움 302동', lat:37.5092, lng:127.0903, item:'수거예정', amount:0, source:'인터넷', paidDate:'2026-04-15', rollover:false, complaint:false},
+  {id:'T303', name:'트리지움 303동', addr:'잠실로 62 트리지움 303동', lat:37.5096, lng:127.0905, item:'수거예정', amount:0, source:'인터넷', paidDate:'2026-04-15', rollover:false, complaint:false},
+  {id:'T304', name:'트리지움 304동', addr:'잠실로 62 트리지움 304동', lat:37.5091, lng:127.0904, item:'수거예정', amount:0, source:'인터넷', paidDate:'2026-04-15', rollover:false, complaint:false},
+  {id:'T318', name:'트리지움 318동', addr:'잠실로 62 트리지움 318동', lat:37.5095, lng:127.0908, item:'수거예정', amount:0, source:'인터넷', paidDate:'2026-04-15', rollover:false, complaint:false},
+
+  // [레이크팰리스 35개 동]
+  {id:'L101', name:'레이크팰리스 101동', addr:'잠실로 88 레이크팰리스 101동', lat:37.5095, lng:127.0945, item:'수거예정', amount:0, source:'인터넷', paidDate:'2026-04-15', rollover:false, complaint:false},
+  {id:'L120', name:'레이크팰리스 120동', addr:'잠실로 88 레이크팰리스 120동', lat:37.5140, lng:127.0793, item:'수거예정', amount:0, source:'인터넷', paidDate:'2026-04-15', rollover:false, complaint:false},
+
+  // [잠실주공 5단지 30개 동]
+  {id:'J501', name:'잠실주공 501동', addr:'송파구 잠실동 501동', lat:37.5161, lng:127.0982, item:'수거예정', amount:0, source:'인터넷', paidDate:'2026-04-15', rollover:false, complaint:false},
+  {id:'J515', name:'잠실주공 515동', addr:'송파구 잠실동 515동', lat:37.5140, lng:127.0797, item:'수거예정', amount:0, source:'인터넷', paidDate:'2026-04-15', rollover:false, complaint:false},
 ];
 const JOBS=RAW
   .filter(j=>!CONFIG.wrongAreas.some(kw=>j.addr.includes(kw)))
