@@ -636,6 +636,7 @@ function renderList(){
   // 그룹핑: 민원→이월→동/단지별
   const grouped={};
   list.forEach(j=>{
+    if (job.item === '위치확인') return;
     const key=j.complaint?'🚨 민원':j.rollover?'🔴 이월':j.area;
     if(!grouped[key])grouped[key]=[];
     grouped[key].push(j);
