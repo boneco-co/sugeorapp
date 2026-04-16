@@ -701,7 +701,7 @@ function closeDetail(){document.getElementById('detail-overlay').classList.remov
 // ══ 카카오맵 ══
 function initMap(){
   if(kakaoMap){renderPins();return;}
-  // 카카오맵이 100% 로드된 후 실행되도록 안전장치
+  // 카카오맵이 100% 로드된 후 실행되도록 안전장치 추가
   kakao.maps.load(function() {
     kakaoMap=new kakao.maps.Map(document.getElementById('kakao-map'),{
       center:new kakao.maps.LatLng(37.5091,127.0875),level:5
