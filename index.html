@@ -906,7 +906,38 @@ function updateStats(){
   document.getElementById('s-remain').textContent=JOBS.filter(j=>!j.done).length;
   document.getElementById('s-done').textContent=JOBS.filter(j=>j.done).length;
 }
+function renderPins(){
+  if(!kakaoMap||!clusterer) return;
+  clusterer.clear();
 
+  const type=document.querySelector('.f-btn.on').dataset.type;
+  const filtered=JOBS.filter(j=>{
+    if(j.done) return false;
+    if(type==='all') return true;
+    return getGrade(j.item)===(type==='heavy'?'A':'C');
+  });
+
+  const markers=filtered.map(j=>{
+    let lat=j.lat; let lng=j.lng;
+    // 동별 좌표가 있으면 교체
+    if(j.dong && T_COORDS[j.dong]){
+      lat=T_COORDS[j.dong].lat; lng=T_COORDS[j.dong].lng;
+    }
+    const pos=new kakao.maps.LatLng(lat,lng);
+    const color=getPinColor(j.date);
+    const grade=getGrade(j.item);
+
+    const m=new kakao.maps.Marker({position:pos});
+    const content=document.createElement('div');
+    content.className=`custom-pin ${color}`;
+    content.innerHTML=`<span>${PIN_LBL[grade]||''}</span>`;
+    content.onclick=(e)=>{e.stopPropagation();showPinSheet(j.id);};
+
+    new kakao.maps.CustomOverlay({content,position:pos,yAnchor:1}).setMap(kakaoMap);
+    return m;
+  });
+  clusterer.addMarkers(markers);
+}
 // ══ 토스트 ══
 let tt;
 function showToast(msg,dur=2500){
