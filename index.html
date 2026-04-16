@@ -698,10 +698,10 @@ function openDetail(id){
 }
 function closeDetail(){document.getElementById('detail-overlay').classList.remove('on');}
 
-  // ══ 카카오맵 ══
+// ══ 카카오맵 ══
 function initMap(){
   if(kakaoMap){renderPins();return;}
-  // 카카오맵이 100% 로드된 후 실행되도록 안전장치 추가
+  // 카카오맵이 100% 로드된 후 실행되도록 안전장치
   kakao.maps.load(function() {
     kakaoMap=new kakao.maps.Map(document.getElementById('kakao-map'),{
       center:new kakao.maps.LatLng(37.5091,127.0875),level:5
@@ -717,9 +717,6 @@ function initMap(){
     kakao.maps.event.addListener(kakaoMap,'click',()=>closePinSheet());
     renderPins();
   });
-}
-  kakao.maps.event.addListener(kakaoMap,'click',()=>closePinSheet());
-  renderPins();
 }
 
 const PIN_LBL={A:'重',B:'中',C:'小'};
