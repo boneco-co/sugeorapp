@@ -1,0 +1,23 @@
+{
+  "name": "대형수거앱",
+  "short_name": "대형수거앱",
+  "description": "대형수거 서비스 웹앱",
+  "start_url": "/sugeorapp/index.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2e6f40",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
