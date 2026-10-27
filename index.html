@@ -393,7 +393,7 @@ button{font-family:inherit;cursor:pointer;border:0}
   <button class="hbtn" id="zone" onclick="showAllWork()">전체</button>
   <button class="hbtn" id="pp-btn" onclick="openPpegiSearch()">🔍접수번호</button>
   <button class="hbtn ic" id="worker" onclick="openWorker()">👤</button>
-  <span id="app-ver">v1027a</span>
+  <span id="app-ver">v1027b</span>
 </div>
 <div id="offbar"></div>
 
@@ -1964,7 +1964,7 @@ setInterval(refreshTodayIfChanged, 60000);
 //   → 화면이 다시 보이는 순간 날짜를 즉시 재확인하고, Firebase 연결도 한 번
 //     끊었다 붙여서 새 데이터를 바로 당겨오게 한다.
 // [10_27a] 사용량 절감: 화면을 켤 때마다 끊었다 붙이면 그때마다 7일치 목록을 다시 받는다(하루 수십 번).
-//   → 5분 넘게 꺼져 있었거나 실제로 연결이 끊긴 경우만 다시 붙인다. 잠깐 껐다 켠 건 연결이 살아 있어 바로 반영된다.
+//   → 20분 넘게 꺼져 있었거나 실제로 연결이 끊긴 경우만 다시 붙인다. 잠깐 껐다 켠 건 연결이 살아 있어 바로 반영된다.
 //   visibilitychange·focus·pageshow 가 한꺼번에 와도 한 번만 처리한다.
 let _hiddenAt = 0, _lastVisibleAt = 0, _fbConnected = false;
 try{ db.ref('.info/connected').on('value', s => { _fbConnected = s.val() === true; }); }catch(e){}
@@ -1974,7 +1974,7 @@ function onAppVisible(){
   _lastVisibleAt = now;
   refreshTodayIfChanged();
   if (typeof db !== 'undefined' && DATA_Q && maybeForceRefresh()) { _hiddenAt = 0; return; }   // [10_15] 하루 두 번 새로받기
-  const longAway = _hiddenAt && (now - _hiddenAt > 5 * 60000);
+  const longAway = _hiddenAt && (now - _hiddenAt > 20 * 60000);   // [10_27b] 5분 → 20분
   _hiddenAt = 0;
   if (!longAway && _fbConnected) return;
   try{
