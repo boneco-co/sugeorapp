@@ -393,7 +393,7 @@ button{font-family:inherit;cursor:pointer;border:0}
   <button class="hbtn" id="zone" onclick="showAllWork()">전체</button>
   <button class="hbtn" id="pp-btn" onclick="openPpegiSearch()">🔍접수번호</button>
   <button class="hbtn ic" id="worker" onclick="openWorker()">👤</button>
-  <span id="app-ver">v1020a</span>
+  <span id="app-ver">v1027a</span>
 </div>
 <div id="offbar"></div>
 
@@ -1963,15 +1963,26 @@ setInterval(refreshTodayIfChanged, 60000);
 //   드물게는 Firebase 재연결이 늦어져 그보다 더 걸릴 수 있다.
 //   → 화면이 다시 보이는 순간 날짜를 즉시 재확인하고, Firebase 연결도 한 번
 //     끊었다 붙여서 새 데이터를 바로 당겨오게 한다.
+// [10_27a] 사용량 절감: 화면을 켤 때마다 끊었다 붙이면 그때마다 7일치 목록을 다시 받는다(하루 수십 번).
+//   → 5분 넘게 꺼져 있었거나 실제로 연결이 끊긴 경우만 다시 붙인다. 잠깐 껐다 켠 건 연결이 살아 있어 바로 반영된다.
+//   visibilitychange·focus·pageshow 가 한꺼번에 와도 한 번만 처리한다.
+let _hiddenAt = 0, _lastVisibleAt = 0, _fbConnected = false;
+try{ db.ref('.info/connected').on('value', s => { _fbConnected = s.val() === true; }); }catch(e){}
 function onAppVisible(){
+  const now = Date.now();
+  if (now - _lastVisibleAt < 3000) return;
+  _lastVisibleAt = now;
   refreshTodayIfChanged();
-  if (typeof db !== 'undefined' && DATA_Q && maybeForceRefresh()) return;   // [10_15] 하루 두 번 새로받기
+  if (typeof db !== 'undefined' && DATA_Q && maybeForceRefresh()) { _hiddenAt = 0; return; }   // [10_15] 하루 두 번 새로받기
+  const longAway = _hiddenAt && (now - _hiddenAt > 5 * 60000);
+  _hiddenAt = 0;
+  if (!longAway && _fbConnected) return;
   try{
     db.goOffline();
     db.goOnline();      // 재연결을 강제해 절전 중 놓친 변경분을 즉시 다시 받는다
   }catch(e){}
 }
-document.addEventListener('visibilitychange', ()=>{ if (!document.hidden) onAppVisible(); });
+document.addEventListener('visibilitychange', ()=>{ if (document.hidden) { _hiddenAt = Date.now(); } else onAppVisible(); });
 window.addEventListener('focus', onAppVisible);
 window.addEventListener('pageshow', onAppVisible);   // 일부 모바일 브라우저는 focus 없이 pageshow만 쏨
 
@@ -2706,10 +2717,15 @@ async function boot(){
     Object.entries(s.val()||{}).forEach(([k,v])=>{ customHolidays[k.replace(/_/g,'-')] = v; });
   }).catch(()=>{});
 
-  withTimeout(db.ref(DB_COORD).once('value'), 8000).then(s=>{
-    coordCache = {...coordCache, ...(s.val()||{})};
-    buildRows(); render();
-  }).catch(()=>{});
+  // [10_27a] 사용량 절감: 좌표 전체(약 150KB)는 하루 한 번만 받는다. 그 사이엔 기기에 남겨 둔 좌표를 쓴다.
+  let _coordDay = ''; try{ _coordDay = localStorage.getItem('work_coords_day') || ''; }catch(e){}
+  if (_coordDay !== toYMD(new Date()) || !Object.keys(coordCache||{}).length) {
+    withTimeout(db.ref(DB_COORD).once('value'), 8000).then(s=>{
+      coordCache = {...coordCache, ...(s.val()||{})};
+      try{ localStorage.setItem('work_coords_day', toYMD(new Date())); }catch(e){}
+      buildRows(); render();
+    }).catch(()=>{});
+  }
 
   startData();
 
