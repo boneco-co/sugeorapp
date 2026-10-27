@@ -43,6 +43,7 @@ button{font-family:inherit;cursor:pointer;border:0}
   border-radius:9px;padding:8px 8px;font-size:13px;font-weight:700;
   display:flex;align-items:center;gap:3px;white-space:nowrap;flex-shrink:0;
 }
+#hd{overflow-x:auto;scrollbar-width:none}   /* [10_28] 작은 폰에서 버튼이 넘치면 옆으로 밀어 본다 */
 .hbtn:active{background:#e2e8f0}
 .hbtn.on{background:var(--blue);border-color:var(--blue);color:#fff}
 .hbtn.ic{padding:8px 10px;flex-shrink:0}
@@ -392,8 +393,10 @@ button{font-family:inherit;cursor:pointer;border:0}
   <button class="hbtn" id="btn-quote" onclick="toggleQuote()">견적</button>
   <button class="hbtn" id="zone" onclick="showAllWork()">전체</button>
   <button class="hbtn" id="pp-btn" onclick="openPpegiSearch()">🔍접수번호</button>
+  <!-- [10_28] 전환 버튼 — 민원 현장앱을 새 탭(이름 고정)으로 연다. 수거앱 화면은 그대로 둔다 -->
+  <a class="hbtn" id="mw-btn" href="https://boneco-minwon.web.app/field.html" target="bn_minwon" rel="noopener" style="text-decoration:none;border-color:#0f7a86;color:#0f7a86">📋민원</a>
   <button class="hbtn ic" id="worker" onclick="openWorker()">👤</button>
-  <span id="app-ver">v1027b</span>
+  <span id="app-ver">v1028a</span>
 </div>
 <div id="offbar"></div>
 
