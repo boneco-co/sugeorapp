@@ -179,6 +179,11 @@ button{font-family:inherit;cursor:pointer;border:0}
 /* [10_13] 빼기번호 검색 */
 #pp-btn{margin-left:auto;background:#fff7ed;border-color:#fdba74;color:#c2410c;padding:8px 6px}
 /* 빼기 버튼이 들어가 머리줄이 좁은 폰에서 넘치지 않게 — 폭 400px 이하에서만 버튼 사이·안쪽 여백을 조금 줄인다 */
+/* [11_2] 안 본 민원이 있으면 [📋민원] 버튼이 주황으로 깜빡이고 건수가 붙는다 */
+#mw-btn{position:relative}
+#mw-btn.mw-alert{animation:mwBlink 1s steps(1,end) infinite}
+@keyframes mwBlink{0%{background:#f97316;color:#fff;border-color:#f97316}50%{background:#fff7ed;color:#c2410c;border-color:#f97316}}
+#mw-btn .mw-n{position:absolute;top:-6px;right:-6px;min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:#dc2626;color:#fff;font-size:11px;line-height:18px;text-align:center;font-weight:900}
 @media (max-width:430px){ #hd{gap:4px;padding-left:6px;padding-right:6px} #hd .hbtn{padding-left:6px;padding-right:6px} }   /* [10_28] 400 → 430: 민원 버튼이 들어가도 한 줄에 */ @media (max-width:380px){ #mw-btn .mw-t{display:none} } @media (max-width:370px){ #hd{gap:3px;padding-left:4px;padding-right:4px} #hd .hbtn{font-size:12px;padding-left:5px;padding-right:5px} }
 .pp-row{display:flex;gap:8px}
 .pp-row input{flex:1;margin:0 !important;text-transform:uppercase;font-weight:800;letter-spacing:.5px}
@@ -396,7 +401,7 @@ button{font-family:inherit;cursor:pointer;border:0}
   <!-- [10_28] 전환 버튼 — 민원 현장앱을 새 탭(이름 고정)으로 연다. 수거앱 화면은 그대로 둔다 -->
   <a class="hbtn" id="mw-btn" href="https://boneco-minwon.web.app/field.html" target="bn_minwon" rel="noopener" style="text-decoration:none;border-color:#0f7a86;color:#0f7a86">📋<span class="mw-t">민원</span></a>
   <button class="hbtn ic" id="worker" onclick="openWorker()">👤</button>
-  <span id="app-ver">v1028b</span>
+  <span id="app-ver">v1102a</span>
 </div>
 <div id="offbar"></div>
 
@@ -478,6 +483,44 @@ const ST_LABEL = {
    ══════════════════════════════════════════════════════════════ */
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
+
+/* ══ [11_2] 민원 알림 — 주간팀(기동반·대형팀)에 아직 아무도 안 본 민원이 있으면 [📋민원] 버튼이 깜빡이고 소리가 난다 ══
+   · 민원앱(boneco-minwon)의 'unseen' 칸만 읽는다: 팀·근무일만 있고 주소·이름은 없다(로그인 없이 읽는 칸).
+   · 현장 민원 화면에서 그 민원을 열면(확인) 민원앱이 칸을 지우고, 여기 깜빡임도 멈춘다.
+   · 소리: 폰은 화면을 한 번 만진 뒤에만 소리를 낼 수 있다 → 첫 터치 때 소리를 켜 두고, 새 민원이 오면 삐삐삐,
+     확인 전까지 2분마다 한 번 더 울린다(화면이 켜져 있을 때만). 야간팀은 수거앱을 쓰지 않으므로 대상 아님. */
+const MW_DB_URL = 'https://boneco-minwon-default-rtdb.asia-southeast1.firebasedatabase.app';
+const MW_TEAMS = ['day', 'large'];   // 민원앱 config.js sugeoTeams 와 같게
+let _mwN = -1, _mwAC = null, _mwRepeat = null;
+function _mwToday(){ const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+function _mwUnlock(){ try { if (!_mwAC) _mwAC = new (window.AudioContext || window.webkitAudioContext)(); if (_mwAC.state === 'suspended') _mwAC.resume(); } catch(e){} }
+['pointerdown','touchstart','keydown'].forEach(ev => document.addEventListener(ev, _mwUnlock, { passive:true }));
+function _mwBeep(){
+  try {
+    if (!_mwAC || _mwAC.state !== 'running' || document.hidden) return;
+    [0, .25, .5].forEach(o => { const g = _mwAC.createGain(), os = _mwAC.createOscillator(); os.frequency.value = 1100; os.connect(g); g.connect(_mwAC.destination);
+      g.gain.setValueAtTime(.25, _mwAC.currentTime + o); os.start(_mwAC.currentTime + o); os.stop(_mwAC.currentTime + o + .15); });
+  } catch(e){}
+  try { if (navigator.vibrate && !document.hidden) navigator.vibrate([200,100,200,100,200]); } catch(e){}
+}
+function _mwShow(n){
+  const b = document.getElementById('mw-btn'); if (!b) return;
+  b.classList.toggle('mw-alert', n > 0);
+  let c = b.querySelector('.mw-n');
+  if (n > 0) { if (!c) { c = document.createElement('b'); c.className = 'mw-n'; b.appendChild(c); } c.textContent = n; }
+  else if (c) c.remove();
+  if (n > _mwN && _mwN >= 0) _mwBeep();          // 새로 늘었을 때 (처음 열 때는 소리 없이 깜빡임만)
+  _mwN = n;
+  clearInterval(_mwRepeat); _mwRepeat = n > 0 ? setInterval(_mwBeep, 120000) : null;
+}
+try {
+  const mwApp = firebase.initializeApp({ databaseURL: MW_DB_URL, apiKey: 'AIzaSyCtSh3rJysDrS8zGUkFJ40D9DzaBByCu-A', projectId: 'boneco-minwon' }, 'minwon');
+  mwApp.database().ref('c/boneco/unseen').on('value', s => {
+    const v = s.val() || {}, today = _mwToday(), from = new Date(Date.now() - 14*864e5).toISOString().slice(0,10);
+    const n = Object.values(v).filter(t => t && MW_TEAMS.includes(t.team) && t.workDate <= today && t.workDate >= from).length;
+    _mwShow(n);
+  }, () => {});
+} catch(e) { console.warn('민원 알림 연결 실패', e); }
 // ══ [10_1] 직원 계정 로그인 (Firebase Authentication 이메일/비밀번호) ══
 //   보안 규칙: 원장 자료는 직원 계정(STAFF_EMAIL)만 읽고 쓴다. 접수 페이지 손님은 익명 로그인이라 접수함에 넣기만 가능.
 //   직원이 하는 일은 그대로 — 하루 첫 화면의 비밀번호 창에 "직원 비밀번호"를 넣으면 그걸로 로그인된다.
