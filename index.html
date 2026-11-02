@@ -401,7 +401,7 @@ button{font-family:inherit;cursor:pointer;border:0}
   <!-- [10_28] 전환 버튼 — 민원 현장앱을 새 탭(이름 고정)으로 연다. 수거앱 화면은 그대로 둔다 -->
   <a class="hbtn" id="mw-btn" href="https://boneco-minwon.web.app/field.html" target="bn_minwon" rel="noopener" style="text-decoration:none;border-color:#0f7a86;color:#0f7a86">📋<span class="mw-t">민원</span></a>
   <button class="hbtn ic" id="worker" onclick="openWorker()">👤</button>
-  <span id="app-ver">v1102a</span>
+  <span id="app-ver">v1102b</span>
 </div>
 <div id="offbar"></div>
 
@@ -941,6 +941,9 @@ async function fillMissingCoords(){
    데이터
    ══════════════════════════════════════════════════════════════ */
 let receipts = {};        // receipt_data 전체
+// [11_2] 환불 품목 자리가 비면 Firebase가 _work품목 배열을 {"1":1} 같은 객체로 돌려준다 → 원래 자리 그대로 배열로 되돌린다
+function _toSlotArray(w){ if (!w || typeof w !== 'object' || Array.isArray(w)) return w; const a = []; Object.keys(w).forEach(k => { const i = +k; if (Number.isInteger(i) && i >= 0) a[i] = w[k]; }); for (let i = 0; i < a.length; i++) if (a[i] === undefined) a[i] = null; return a; }
+function normalizeWorkSlots(v){ for (const id in (v||{})) { const r = v[id]; if (!r || typeof r !== 'object') continue; ['_work품목','_work보류','_item환불'].forEach(k => { if (r[k]) r[k] = _toSlotArray(r[k]); }); } return v; }
 let PP_CACHE = null, PP_CACHE_AT = 0, PP_ROW = null;   // [10_13] 빼기번호 검색 자료
 let ROWS = [];            // 화면에 쓸 작업 대상
 // 담당 구역은 여러 개를 함께 고를 수 있다 (예: 5단지 + 잠실동)
@@ -2095,7 +2098,7 @@ function finishWork(){
     Array.isArray(r._items) ? r._items.length : 0,
     (() => { let n=0; for(let i=1;i<=10;i++){ if(!r['품목'+i]) break; n=i; } return n; })()
   );
-  const items = new Array(totalLen).fill(null);
+  const items = new Array(totalLen).fill(0);   // [11_2] 빈자리(환불 품목)는 null 대신 0 — null이면 Firebase가 배열을 객체로 바꿔 원장이 못 읽었다
   its.forEach(i => { items[i.idx] = CHECK[i.idx] != null ? CHECK[i.idx] : 0; });   // [9_26] 실제 수거 개수(숫자)로 저장
   // 환불 자리: 0 유지 (수거 아님)
   const rf = Array.isArray(r._item환불) ? r._item환불 : null;
@@ -2424,6 +2427,7 @@ async function ppLoad(q){
     const s = await db.ref(DB_RECEIPT).orderByKey().startAt(from).endAt(to).once('value');
     got = s.val() || {};
   }
+  normalizeWorkSlots(got);   // [11_2]
   PP_CACHE = got; PP_CACHE_AT = Date.now();
   // [10_14] 번호칸에 접수번호가 적혀 있으면 그 건이 바로 답이다(예전 건은 접수에 작업번호만 있어 번호로 맞출 수 없다)
   if (key && got[key]) return [key, got[key]];
@@ -2692,7 +2696,7 @@ function loadCache(){
     if (!c) return false;
     coordCache = c.coords||{};
     customHolidays = c.holi||{};
-    receipts = c.rows||{};
+    receipts = normalizeWorkSlots(c.rows||{});
     buildRows(); collectWorkers(); render();
     return ROWS.length>0;
   }catch(e){ return false; }
@@ -2810,7 +2814,7 @@ function startData(){
   markForceSlot();
   DATA_Q = db.ref(DB_RECEIPT).orderByChild('_jiseo_app_date').startAt(since);
   DATA_Q.on('value', snap=>{
-    receipts = snap.val() || {};
+    receipts = normalizeWorkSlots(snap.val() || {});
     TODAY = toYMD(new Date());
     buildRows();
     collectWorkers();
