@@ -401,7 +401,7 @@ button{font-family:inherit;cursor:pointer;border:0}
   <!-- [10_28] 전환 버튼 — 민원 현장앱을 새 탭(이름 고정)으로 연다. 수거앱 화면은 그대로 둔다 -->
   <a class="hbtn" id="mw-btn" href="https://boneco-minwon.web.app/field.html" target="bn_minwon" rel="noopener" style="text-decoration:none;border-color:#0f7a86;color:#0f7a86">📋<span class="mw-t">민원</span></a>
   <button class="hbtn ic" id="worker" onclick="openWorker()">👤</button>
-  <span id="app-ver">v1103a</span>
+  <span id="app-ver">v1104a</span>
 </div>
 <div id="offbar"></div>
 
@@ -491,31 +491,16 @@ const db = firebase.database();
      확인 전까지 2분마다 한 번 더 울린다(화면이 켜져 있을 때만). 야간팀은 수거앱을 쓰지 않으므로 대상 아님. */
 const MW_DB_URL = 'https://boneco-minwon-default-rtdb.asia-southeast1.firebasedatabase.app';
 const MW_TEAMS = ['day', 'large'];   // 민원앱 config.js sugeoTeams 와 같게
-const MW_TEAM_NAME = { day:'기동반', large:'대형팀', none:'민원 알림 안 받음' };
-/* [11_3] 깜빡임은 담당 팀 폰에만 — 이 폰의 팀(👤 수거원 창에서 고름)의 민원만 센다.
-   'day'=기동반 / 'large'=대형팀 / 'none'=안 받음. 아직 안 골랐으면 한 번 물어본다(고르기 전엔 예전처럼 두 팀 모두). */
-function mwMyTeam(){ try { return localStorage.getItem('mw_team') || ''; } catch(e){ return ''; } }
+/* [11_4] 깜빡임은 담당 팀 폰에만 — 팀은 묻지 않는다(시안에 없는 질문 창은 뺐다).
+   팀은 민원앱 로그인(팀+차량)에서 넘겨받는다: 민원앱 [🚛 수거앱] 버튼이 '?mwteam=large' 처럼 붙여 열면 이 폰에 기억.
+   기억된 팀(day=기동반 / large=대형팀)이 있으면 그 팀 민원만, 없으면 예전처럼 두 팀 모두 센다. */
+try { const q = new URLSearchParams(location.search).get('mwteam'); if (q === 'day' || q === 'large') localStorage.setItem('mw_team', q); } catch(e){}
+function mwMyTeam(){ try { const t = localStorage.getItem('mw_team') || ''; return MW_TEAMS.includes(t) ? t : ''; } catch(e){ return ''; } }
 let _mwLast = {};
 function _mwCount(v){
   const today = _mwToday(), from = new Date(Date.now() - 14*864e5).toISOString().slice(0,10), my = mwMyTeam();
-  if (my === 'none') return 0;
-  const teams = MW_TEAMS.includes(my) ? [my] : MW_TEAMS;
+  const teams = my ? [my] : MW_TEAMS;
   return Object.values(v || {}).filter(t => t && teams.includes(t.team) && t.workDate <= today && t.workDate >= from).length;
-}
-function mwTeamChips(){
-  const my = mwMyTeam();
-  return `<div style="font-size:13px;font-weight:800;margin:16px 0 7px">민원 담당 팀 <span style="font-size:12px;color:var(--dim);font-weight:600">이 팀 민원만 [📋민원] 버튼이 깜빡입니다</span></div>
-    <div class="chips" id="mwteam">${['day','large','none'].map(k=>`<button type="button" class="chip mwt ${my===k?'on':''}" data-t="${k}"
-      onclick="[...this.parentNode.children].forEach(c=>c.classList.remove('on'));this.classList.add('on')">${MW_TEAM_NAME[k]}</button>`).join('')}</div>`;
-}
-function mwReadTeam(){ const el = document.querySelector('#mwteam .mwt.on'); return el ? el.dataset.t : ''; }
-function mwSetTeam(k){ try { if (k) localStorage.setItem('mw_team', k); } catch(e){} _mwShow(_mwCount(_mwLast)); }
-function mwAskTeam(){
-  if (mwMyTeam() || document.getElementById('modal').classList.contains('show')) return;
-  showModal(`<h3>이 폰은 어느 팀인가요?</h3>
-    <div style="font-size:14px;color:var(--dim);margin-bottom:4px">담당 팀 민원이 왔을 때만 [📋민원] 버튼이 깜빡입니다. (👤 버튼에서 언제든 바꿀 수 있어요)</div>
-    ${mwTeamChips()}
-    <div class="mrow"><button class="okb" style="flex:1" onclick="const k=mwReadTeam(); if(!k){toast('팀을 골라 주세요');return;} mwSetTeam(k); closeModal(); toast('📋 '+MW_TEAM_NAME[k])">저장</button></div>`);
 }
 let _mwN = -1, _mwAC = null, _mwRepeat = null;
 function _mwToday(){ const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
@@ -2660,7 +2645,6 @@ function openWorker(){
       <button type="button" class="allbtn" onclick="clearZoneChips()">전체</button>
     </div>
     ${zoneChips(ZONES, false)}
-    ${mwTeamChips()}
 
     <div class="mrow">
       <button class="okb" style="flex:1" onclick="saveLogin()">시작하기</button>
@@ -2677,7 +2661,6 @@ function saveLogin(){
 
   ZONES = readChips();
   localStorage.setItem('zones', JSON.stringify(ZONES));
-  mwSetTeam(mwReadTeam());   // [11_3] 민원 담당 팀
 
   closeModal(); render(); fitZone();
   toast('👤 '+n+' · '+zoneLabel());
@@ -2849,7 +2832,6 @@ function startData(){
     hideBoot();
     saveCache();
     if (!WORKER) openWorker();
-    else if (!mwMyTeam()) setTimeout(mwAskTeam, 1500);   // [11_3] 팀을 아직 안 고른 폰은 한 번 묻는다
     fillMissingCoords();
   }, err=>{
     // 읽기 실패 — 캐시가 있으면 그대로 쓴다
