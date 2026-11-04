@@ -484,24 +484,44 @@ const ST_LABEL = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-/* ══ [11_2] 민원 알림 — 주간팀(기동반·대형팀)에 아직 아무도 안 본 민원이 있으면 [📋민원] 버튼이 깜빡이고 소리가 난다 ══
-   · 민원앱(boneco-minwon)의 'unseen' 칸만 읽는다: 팀·근무일만 있고 주소·이름은 없다(로그인 없이 읽는 칸).
-   · 현장 민원 화면에서 그 민원을 열면(확인) 민원앱이 칸을 지우고, 여기 깜빡임도 멈춘다.
+/* ══ [11_2] 민원 알림 — [📋민원] 버튼 깜빡임·소리 (기준은 아래 [11_4])
+   · 민원앱(boneco-minwon)의 'unseen' 칸만 읽는다: 팀·근무일·접수시각만 있고 주소·이름은 없다(로그인 없이 읽는 칸).
    · 소리: 폰은 화면을 한 번 만진 뒤에만 소리를 낼 수 있다 → 첫 터치 때 소리를 켜 두고, 새 민원이 오면 삐삐삐,
-     확인 전까지 2분마다 한 번 더 울린다(화면이 켜져 있을 때만). 야간팀은 수거앱을 쓰지 않으므로 대상 아님. */
+     확인 전까지 2분마다 한 번 더 울린다(화면이 켜져 있을 때만). */
 const MW_DB_URL = 'https://boneco-minwon-default-rtdb.asia-southeast1.firebasedatabase.app';
-const MW_TEAMS = ['day', 'large'];   // 민원앱 config.js sugeoTeams 와 같게
-/* [11_4] 깜빡임은 담당 팀 폰에만 — 팀은 묻지 않는다(시안에 없는 질문 창은 뺐다).
-   팀은 민원앱 로그인(팀+차량)에서 넘겨받는다: 민원앱 [🚛 수거앱] 버튼이 '?mwteam=large' 처럼 붙여 열면 이 폰에 기억.
-   기억된 팀(day=기동반 / large=대형팀)이 있으면 그 팀 민원만, 없으면 예전처럼 두 팀 모두 센다. */
-try { const q = new URLSearchParams(location.search).get('mwteam'); if (q === 'day' || q === 'large') localStorage.setItem('mw_team', q); } catch(e){}
-function mwMyTeam(){ try { const t = localStorage.getItem('mw_team') || ''; return MW_TEAMS.includes(t) ? t : ''; } catch(e){ return ''; } }
+/* [11_4] 알림 기준 (팀·이름 구분 없음) — 로그인한(수거원 이름이 있는) 모든 수거앱 폰:
+   ① 오늘 오후 3시 전 접수된 미처리 민원  ② 지난 날짜에 접수된 미처리 민원 전부  → [📋민원] 깜빡임·소리·진동·숫자
+   · 'unseen' 칸 = 민원앱의 미처리 민원 목록(팀·근무일·접수시각만, 처리되면 민원앱이 지움)
+   · 확인은 사람(수거원 이름)마다 따로 이 폰에 기억: [📋민원]을 눌러 열면 지금 보이는 건은 그 사람 폰에서만 꺼진다. 새 민원이 오면 다시 깜빡.
+   · 팀 질문 창은 없다(11/3 v1103a 에서 넣었다가 뺐음). */
 let _mwLast = {};
-function _mwCount(v){
-  const today = _mwToday(), from = new Date(Date.now() - 14*864e5).toISOString().slice(0,10), my = mwMyTeam();
-  const teams = my ? [my] : MW_TEAMS;
-  return Object.values(v || {}).filter(t => t && teams.includes(t.team) && t.workDate <= today && t.workDate >= from).length;
+function _mwWorker(){ try { return (localStorage.getItem('worker') || '').trim(); } catch(e){ return ''; } }
+function _mwSeenKey(){ return 'mw_seen_' + _mwWorker(); }
+function _mwSeen(){ try { const v = JSON.parse(localStorage.getItem(_mwSeenKey()) || '{}'); return v && typeof v === 'object' ? v : {}; } catch(e){ return {}; } }
+function _mwYmd(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+function _mwDue(v){   // 알림 대상인 미처리 민원 번호 목록
+  const today = _mwToday(), from = _mwYmd(new Date(Date.now() - 60*864e5));
+  return Object.entries(v || {}).filter(([, t]) => {
+    if (!t) return false;
+    const r = Number(t.recvAt) || 0, d = r ? _mwYmd(new Date(r)) : String(t.workDate || '');
+    if (!d || d < from) return false;
+    if (d < today) return true;                                   // ② 지난 날짜 미처리 전부
+    return d === today && (!r || new Date(r).getHours() < 15);    // ① 오늘 오후 3시 전 접수
+  }).map(([k]) => k);
 }
+function _mwCount(v){
+  if (!_mwWorker()) return 0;                                     // 로그인(수거원 이름) 전에는 알리지 않음
+  const s = _mwSeen();
+  return _mwDue(v).filter(k => !s[k]).length;
+}
+function _mwMarkSeen(){   // [📋민원]을 눌러 열면 이 사람 폰에서만 꺼짐
+  if (!_mwWorker()) return;
+  const due = _mwDue(_mwLast), old = _mwSeen(), v = {};
+  due.forEach(k => { v[k] = old[k] || Date.now(); });   // 지금 미처리인 것만 남겨 저장 크기 정리
+  try { localStorage.setItem(_mwSeenKey(), JSON.stringify(v)); } catch(e){}
+  _mwShow(_mwCount(_mwLast));
+}
+try { const mb = document.getElementById('mw-btn'); if (mb) mb.addEventListener('click', _mwMarkSeen); } catch(e){}
 let _mwN = -1, _mwAC = null, _mwRepeat = null;
 function _mwToday(){ const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
 function _mwUnlock(){ try { if (!_mwAC) _mwAC = new (window.AudioContext || window.webkitAudioContext)(); if (_mwAC.state === 'suspended') _mwAC.resume(); } catch(e){} }
@@ -2663,6 +2683,7 @@ function saveLogin(){
   localStorage.setItem('zones', JSON.stringify(ZONES));
 
   closeModal(); render(); fitZone();
+  try { _mwN = -1; _mwShow(_mwCount(_mwLast)); } catch(e){}   // [11_4] 수거원(사람)이 바뀌면 그 사람 기준으로 민원 알림 다시 셈
   toast('👤 '+n+' · '+zoneLabel());
 }
 
