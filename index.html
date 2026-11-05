@@ -399,9 +399,9 @@ button{font-family:inherit;cursor:pointer;border:0}
   <button class="hbtn" id="zone" onclick="showAllWork()">전체</button>
   <button class="hbtn" id="pp-btn" onclick="openPpegiSearch()">🔍접수번호</button>
   <!-- [10_28] 전환 버튼 — 민원 현장앱을 새 탭(이름 고정)으로 연다. 수거앱 화면은 그대로 둔다 -->
-  <a class="hbtn" id="mw-btn" href="https://boneco-minwon.web.app/field.html" target="bn_minwon" rel="noopener" style="text-decoration:none;border-color:#0f7a86;color:#0f7a86">📋<span class="mw-t">민원</span></a>
+  <a class="hbtn" id="mw-btn" href="https://boneco-minwon.web.app/?from=sugeo" target="bn_minwon" rel="noopener" style="text-decoration:none;border-color:#0f7a86;color:#0f7a86">📋<span class="mw-t">민원</span></a>
   <button class="hbtn ic" id="worker" onclick="openWorker()">👤</button>
-  <span id="app-ver">v1104a</span>
+  <span id="app-ver">v1105a</span>
 </div>
 <div id="offbar"></div>
 
@@ -2001,6 +2001,11 @@ function saveWork(updates){
   q.push({updates, at:Date.now()});
   setQueue(q);
   flushQueue();
+  // [11_5] 처리내역(3일)을 보다가 [🔄 완료 취소]·수거내역 수정을 하면 '오늘까지' 보기로 돌아간다 (되돌린 건을 바로 다시 처리할 수 있게)
+  if (DATEF === 'done') {
+    DATEF = 'today'; try { localStorage.setItem('datef', 'today'); } catch(e){}
+    setTimeout(() => { try { render(); fitZone(); } catch(e){} }, 0);
+  }
 }
 
 let flushing = false;
