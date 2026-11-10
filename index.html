@@ -3044,6 +3044,9 @@ async function checkGate(){
 <div id="lgx-card"></div>
 <script>
 (function(){
+  const _t = m => (typeof toast === 'function' ? toast : (window.MW && MW.toast) || alert)(m);
+  const _view = () => !!window.LGX_VIEW || (typeof VIEWONLY !== 'undefined' && VIEWONLY);
+  const _kakao = () => typeof loadKakaoMap === 'function' ? loadKakaoMap() : new Promise((ok, no) => { const sc = document.createElement('script'); sc.src = 'https://dapi.kakao.com/v2/maps/sdk.js?autoload=false&appkey=' + ((window.MW && MW.C && MW.C.kakao && MW.C.kakao.jsKey) || ''); sc.onload = () => kakao.maps.load(ok); sc.onerror = no; document.head.appendChild(sc); });
   // 부장님 앱(종합예방관리대장)과 같은 Firebase — 읽기만. 부장님 앱처럼 보이지 않는 자동(익명) 로그인으로 읽는다.
   const BOSS = { apiKey:'AIzaSyCrJaARREMDXFfhicjUwWFyqkyTbVMRsYk', authDomain:'minwon-c29c2.firebaseapp.com',
     databaseURL:'https://minwon-c29c2-default-rtdb.asia-southeast1.firebasedatabase.app', projectId:'minwon-c29c2' };
@@ -3093,7 +3096,7 @@ async function checkGate(){
     document.querySelectorAll('#lgx-tabs button').forEach(b => b.onclick = () => lgxOpen(b.dataset.k));
     await load();
     if (!lmap){
-      if (!(window.kakao && kakao.maps && kakao.maps.Map)){ try { await loadKakaoMap(); } catch(e){} }
+      if (!(window.kakao && kakao.maps && kakao.maps.Map)){ try { await _kakao(); } catch(e){} }
       if (window.kakao && kakao.maps && kakao.maps.Map) lmap = new kakao.maps.Map(document.getElementById('lgx-map'), { center: new kakao.maps.LatLng(37.5068, 127.0885), level: 5 });
     } else setTimeout(() => lmap.relayout(), 30);
     locate(); draw();
@@ -3126,7 +3129,7 @@ async function checkGate(){
   const refOf = (k, x) => db().database().ref(k === 'hazard' ? 'report/recs/' + x.id : (x._t === 'rfid' ? 'report/rfid/' : 'report/biz/') + x.id);
   const phRefOf = (k, x) => db().database().ref(k === 'hazard' ? 'report/photos/' + x.id + '/extra' : (x._t === 'rfid' ? 'report/rfidPhotos/' : 'report/bizPhotos/') + x.id);
   const nowS = () => { const d = new Date(), p = n => String(n).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()); };
-  const who = () => { try { return (localStorage.getItem('worker') || '').trim() || '현장'; } catch(e){ return '현장'; } };
+  const who = () => { try { return window.LGX_WHO || (localStorage.getItem('worker') || '').trim() || '현장'; } catch(e){ return '현장'; } };
   function shrink(file){ return new Promise((ok, no) => { const im = new Image(); im.onload = () => { const r = Math.min(1, 640 / Math.max(im.width, im.height)), c = document.createElement('canvas');
       c.width = Math.round(im.width * r); c.height = Math.round(im.height * r); c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); ok(c.toDataURL('image/jpeg', .55)); URL.revokeObjectURL(im.src); };
     im.onerror = no; im.src = URL.createObjectURL(file); }); }
@@ -3161,11 +3164,11 @@ async function checkGate(){
       Object.values(v).forEach(b => { if (typeof b === 'string' && b.indexOf('data:image') === 0){ const im = document.createElement('img'); im.src = b; im.style.opacity = '.6'; im.title = '지난 사진'; box.appendChild(im); } }); }).catch(() => {});
   }
   async function save(k, x){
-    if (typeof VIEWONLY !== 'undefined' && VIEWONLY){ toast('👀 보기 모드라 저장할 수 없어요'); return; }   // [11_10]
+    if (_view()){ _t('👀 보기 모드라 저장할 수 없어요'); return; }
     const c = document.getElementById('lgx-card'), memo = c.querySelector('#lgx-memo').value.trim(), up = {}, at = nowS(), by = who();
     let changed = false;
     c.querySelectorAll('[data-f]').forEach(i => { const v = i.value.trim(); if (v !== String(x[i.dataset.f] || '')) { up[i.dataset.f] = v; changed = true; } });
-    if (ok === null && !memo && !newPh.length && !changed){ toast('사진·이상 여부·메모 중 하나는 넣어 주세요'); return; }
+    if (ok === null && !memo && !newPh.length && !changed){ _t('사진·이상 여부·메모 중 하나는 넣어 주세요'); return; }
     const hk = 'h' + Date.now().toString(36);
     up['hist/' + hk] = { at, by, type: ok === null ? (changed ? '내용 수정' : '현장 확인') : (ok ? '✅ 점검 이상 없음' : '⚠️ 점검 이상 있음'), memo, photos: newPh.length,
       edits: changed ? Object.keys(up).filter(f => f.indexOf('hist/') < 0).join(',') : '' };
@@ -3178,8 +3181,8 @@ async function checkGate(){
       if (newPh.length && k !== 'hazard'){ const s = await phRefOf(k, x).once('value'); up.phCount = Object.keys(s.val() || {}).length; }
       await refOf(k, x).update(up);
       Object.keys(up).forEach(f => { if (f.indexOf('hist/') === 0){ x.hist = x.hist || {}; x.hist[f.slice(5)] = up[f]; } else x[f] = up[f]; });
-      toast('✅ 저장했습니다 — 종합예방관리대장에 들어갔어요'); card(x);
-    } catch(e){ btn.disabled = false; btn.textContent = '저장'; toast('⚠️ 저장하지 못했습니다 — ' + (e && e.code || '연결 확인')); }
+      _t('✅ 저장했습니다 — 종합예방관리대장에 들어갔어요'); card(x);
+    } catch(e){ btn.disabled = false; btn.textContent = '저장'; _t('⚠️ 저장하지 못했습니다 — ' + (e && e.code || '연결 확인')); }
   }
   // [변경 기록] 작은 창: 날짜 · 전→후 · 사유 · 메모 → 이력에 남기고, 해지·재계약·교체는 상태·모델에도 반영
   function evForm(k, x, t){
@@ -3193,7 +3196,7 @@ async function checkGate(){
       + '<button type="button" class="lgx-save" id="ev-save">기록 남기기</button><button type="button" class="lgx-close" style="width:100%;margin-top:8px" id="ev-x">취소</button>';
     c.querySelector('#ev-x').onclick = () => card(x);
     c.querySelector('#ev-save').onclick = async () => {
-      if (typeof VIEWONLY !== 'undefined' && VIEWONLY){ toast('👀 보기 모드라 저장할 수 없어요'); return; }
+      if (_view()){ _t('👀 보기 모드라 저장할 수 없어요'); return; }
       const g = id => (c.querySelector(id) || {}).value || '', up = {}, at = nowS(), by = who();
       const hk = 'h' + Date.now().toString(36);
       up['hist/' + hk] = { at, by, type: t, date: g('#ev-d'), from: isSwap ? g('#ev-from').trim() : '', to: isSwap ? g('#ev-to').trim() : '', why: g('#ev-why').trim(), memo: g('#ev-memo').trim() };
@@ -3203,8 +3206,8 @@ async function checkGate(){
       up.updatedAt = at;
       try { await refOf(k, x).update(up);
         Object.keys(up).forEach(f => { if (f.indexOf('hist/') === 0){ x.hist = x.hist || {}; x.hist[f.slice(5)] = up[f]; } else x[f] = up[f]; });
-        toast('✅ ' + t + ' 기록을 남겼습니다'); card(x); draw();
-      } catch(e){ toast('⚠️ 기록하지 못했습니다 — ' + (e && e.code || '연결 확인')); }
+        _t('✅ ' + t + ' 기록을 남겼습니다'); card(x); draw();
+      } catch(e){ _t('⚠️ 기록하지 못했습니다 — ' + (e && e.code || '연결 확인')); }
     };
   }
 })();
