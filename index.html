@@ -400,8 +400,9 @@ button{font-family:inherit;cursor:pointer;border:0}
   <button class="hbtn" id="pp-btn" onclick="openPpegiSearch()">🔍접수번호</button>
   <!-- [10_28] 전환 버튼 — 민원 현장앱을 새 탭(이름 고정)으로 연다. 수거앱 화면은 그대로 둔다 -->
   <a class="hbtn" id="mw-btn" href="https://boneco-minwon.web.app/?from=sugeo" target="bn_minwon" rel="noopener" style="text-decoration:none;border-color:#0f7a86;color:#0f7a86">📋<span class="mw-t">민원</span></a>
+  <button class="hbtn" id="lgx-btn" onclick="openLedgers()" style="border-color:#7c4a1e;color:#7c4a1e">🗂<span class="mw-t">관리대장</span></button>   <!-- [11_10] -->
   <button class="hbtn ic" id="worker" onclick="openWorker()">👤</button>
-  <span id="app-ver">v1105a</span>
+  <span id="app-ver">v1110a</span>
 </div>
 <div id="offbar"></div>
 
@@ -2957,5 +2958,152 @@ async function checkGate(){
   setTimeout(()=>{ const el=document.getElementById('gateInput'); if(el) el.focus(); }, 150);
 })();
 </script>
+<!-- ══ [11_10] 🗂 관리대장 — 종합예방관리대장(부장님 앱) 대장 4개를 지도로 보기 (읽기만) ══ -->
+<style>
+#lgx-ov{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:3000;display:none;align-items:flex-end;justify-content:center}
+#lgx-ov.on{display:flex}
+#lgx-sheet{background:#fff;width:min(520px,100%);border-radius:18px 18px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px));display:grid;gap:10px}
+#lgx-sheet h3{margin:0;font-size:17px}
+.lgx-four{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.lgx-b{border:none;border-radius:14px;padding:14px 10px;color:#fff;font-weight:900;font-size:15px;text-align:left;display:grid;gap:2px;min-height:72px;cursor:pointer}
+.lgx-b small{font-weight:600;opacity:.92;font-size:12px}
+.lgx-sub{display:none;grid-template-columns:1fr 1fr;gap:8px;border:2px solid #15803d;border-radius:14px;padding:8px}
+.lgx-sub.on{display:grid}
+.lgx-close{border:1px solid #d9e1e8;background:#fff;border-radius:10px;padding:10px;font-weight:800;font-size:14px}
+#lgx-pane{position:fixed;inset:0;background:#fff;z-index:2900;display:none;flex-direction:column}
+#lgx-pane.on{display:flex}
+#lgx-top{display:flex;gap:8px;align-items:center;padding:calc(8px + env(safe-area-inset-top,0px)) 10px 8px;border-bottom:1px solid #e5e7eb}
+#lgx-top b{font-size:16px}
+#lgx-top button{border:1px solid #d9e1e8;background:#fff;border-radius:10px;padding:7px 10px;font-weight:800}
+#lgx-tabs{display:flex;gap:6px;overflow-x:auto;padding:8px 10px}
+#lgx-tabs button{white-space:nowrap;border:1px solid #d9e1e8;border-radius:999px;padding:6px 11px;font-size:13px;font-weight:800;background:#fff;color:#4b5563}
+#lgx-tabs button.on{color:#fff;border-color:transparent}
+#lgx-map{flex:1;min-height:200px}
+#lgx-list{max-height:34vh;overflow:auto;border-top:1px solid #e5e7eb}
+.lgx-it{display:flex;justify-content:space-between;gap:8px;padding:10px 12px;border-bottom:1px solid #f1f5f9;font-size:14px;cursor:pointer}
+.lgx-it span{color:#6b7280;white-space:nowrap;font-size:13px}
+.lgx-it.off{opacity:.55}
+.lgx-pin{transform:translate(-50%,-100%);color:#fff;font-size:11px;font-weight:900;border-radius:999px;padding:3px 8px;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.25);cursor:pointer;max-width:140px;overflow:hidden;text-overflow:ellipsis}
+.lgx-me{transform:translate(-50%,-50%);width:16px;height:16px;border-radius:50%;background:#2563eb;border:3px solid #fff;box-shadow:0 0 0 2px #2563eb}
+#lgx-card{position:fixed;left:0;right:0;bottom:0;z-index:3100;background:#fff;border-radius:18px 18px 0 0;box-shadow:0 -6px 24px rgba(0,0,0,.18);padding:14px 16px calc(14px + env(safe-area-inset-bottom,0px));display:none;max-height:70vh;overflow:auto}
+#lgx-card.on{display:block}
+#lgx-card h4{margin:0 0 6px;font-size:16px}
+.lgx-row{display:grid;grid-template-columns:84px 1fr;gap:8px;font-size:14px;padding:5px 0;border-bottom:1px solid #f3f4f6}
+.lgx-row b{color:#6b7280;font-weight:700}
+</style>
+<div id="lgx-ov" onclick="if(event.target===this)lgxClose()"><div id="lgx-sheet">
+  <h3>🗂 어떤 대장을 볼까요?</h3>
+  <div class="lgx-four">
+    <button type="button" class="lgx-b" style="background:#dc2626" onclick="lgxOpen('hazard')">⚠️ 재해예방<small id="lgx-c-hazard">…</small></button>
+    <button type="button" class="lgx-b" style="background:#1a56db" onclick="lgxOpen('rfid')">📡 RFID<small id="lgx-c-rfid">…</small></button>
+    <button type="button" class="lgx-b" style="background:#15803d" onclick="document.getElementById('lgx-sub').classList.toggle('on')">♻️ 감량의무사업장<small id="lgx-c-duty">… · 눌러서 고르기 ▾</small></button>
+    <button type="button" class="lgx-b" style="background:#7c4a1e" onclick="lgxOpen('cafe')">☕ 커피매장<small id="lgx-c-cafe">…</small></button>
+  </div>
+  <div class="lgx-sub" id="lgx-sub">
+    <button type="button" class="lgx-b" style="background:#15803d;min-height:56px" onclick="lgxOpen('recycle')">♻️ 재활용<small id="lgx-c-recycle">…</small></button>
+    <button type="button" class="lgx-b" style="background:#b45309;min-height:56px" onclick="lgxOpen('food')">🍲 음식물<small id="lgx-c-food">…</small></button>
+  </div>
+  <button type="button" class="lgx-close" onclick="lgxClose()">닫기</button>
+</div></div>
+<div id="lgx-pane">
+  <div id="lgx-top"><button type="button" onclick="lgxBack()">← 작업 목록</button><b id="lgx-ttl"></b></div>
+  <div id="lgx-tabs"></div>
+  <div id="lgx-map"></div>
+  <div id="lgx-list"></div>
+</div>
+<div id="lgx-card"></div>
+<script>
+(function(){
+  // 부장님 앱(종합예방관리대장)과 같은 Firebase — 읽기만. 부장님 앱처럼 보이지 않는 자동(익명) 로그인으로 읽는다.
+  const BOSS = { apiKey:'AIzaSyCrJaARREMDXFfhicjUwWFyqkyTbVMRsYk', authDomain:'minwon-c29c2.firebaseapp.com',
+    databaseURL:'https://minwon-c29c2-default-rtdb.asia-southeast1.firebasedatabase.app', projectId:'minwon-c29c2' };
+  const K = { hazard:['⚠️ 재해예방','#dc2626'], rfid:['📡 RFID','#1a56db'], recycle:['♻️ 감량·재활용','#15803d'], food:['🍲 감량·음식물','#b45309'], cafe:['☕ 커피매장','#7c4a1e'] };
+  let app = null, D = null, loading = null, cur = 'hazard', lmap = null, pins = [], me = null, meOv = null;
+  const E = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const posOf = x => x && x.pos && x.pos.lat ? x.pos : (x && x.addrPos && x.addrPos.lat ? x.addrPos : null);
+  const isUse = x => x._t === 'rfid' ? (x.status || '사용') === '사용' : (x.status || '계약') !== '해지';
+  function db(){
+    if (!app){ app = firebase.apps.find(a => a.name === 'boss') || firebase.initializeApp(BOSS, 'boss'); }
+    return app;
+  }
+  function load(){
+    if (D) return Promise.resolve(D);
+    if (loading) return loading;
+    loading = (async () => {
+      const a = db();
+      try { if (!a.auth().currentUser) await a.auth().signInAnonymously(); } catch(e){}
+      const rd = p => a.database().ref(p).once('value').then(s => s.val() || {}).catch(() => ({}));
+      const [recs, rfid, biz] = await Promise.all([rd('report/recs'), rd('report/rfid'), rd('report/biz')]);
+      const arr = o => Object.entries(o || {}).map(([id, v]) => Object.assign({ id }, v || {}));
+      const bz = arr(biz);
+      D = { hazard: arr(recs).filter(r => r.recType === 'hazard'), rfid: arr(rfid).map(x => Object.assign(x, { _t:'rfid' })),
+            recycle: bz.filter(b => b.kind === 'recycle'), food: bz.filter(b => b.kind === 'food'), cafe: bz.filter(b => b.kind === 'cafe') };
+      return D;
+    })();
+    loading.catch(() => { loading = null; });
+    return loading;
+  }
+  window.openLedgers = async function(){
+    document.getElementById('lgx-ov').classList.add('on');
+    document.getElementById('lgx-sub').classList.remove('on');
+    const d = await load();
+    const n = k => d[k].length;
+    const set = (id, t) => { const el = document.getElementById(id); if (el) el.textContent = t; };
+    set('lgx-c-hazard', n('hazard') + '건'); set('lgx-c-rfid', n('rfid') + '대'); set('lgx-c-cafe', n('cafe') + '곳');
+    set('lgx-c-duty', (n('recycle') + n('food')) + '곳 · 눌러서 고르기 ▾'); set('lgx-c-recycle', n('recycle') + '곳'); set('lgx-c-food', n('food') + '곳');
+    if (!n('hazard') && !n('rfid') && !n('cafe') && !n('recycle') && !n('food')) set('lgx-c-hazard', '읽지 못함');
+  };
+  window.lgxClose = () => document.getElementById('lgx-ov').classList.remove('on');
+  window.lgxBack = () => { document.getElementById('lgx-pane').classList.remove('on'); document.getElementById('lgx-card').classList.remove('on'); };
+  window.lgxOpen = async function(k){
+    cur = k; lgxClose();
+    document.getElementById('lgx-pane').classList.add('on');
+    document.getElementById('lgx-ttl').textContent = K[k][0];
+    document.getElementById('lgx-tabs').innerHTML = Object.keys(K).map(x => '<button type="button" data-k="' + x + '"' + (x === k ? ' class="on" style="background:' + K[x][1] + '"' : '') + '>' + K[x][0] + '</button>').join('');
+    document.querySelectorAll('#lgx-tabs button').forEach(b => b.onclick = () => lgxOpen(b.dataset.k));
+    await load();
+    if (!lmap){
+      if (!(window.kakao && kakao.maps && kakao.maps.Map)){ try { await loadKakaoMap(); } catch(e){} }
+      if (window.kakao && kakao.maps && kakao.maps.Map) lmap = new kakao.maps.Map(document.getElementById('lgx-map'), { center: new kakao.maps.LatLng(37.5068, 127.0885), level: 5 });
+    } else setTimeout(() => lmap.relayout(), 30);
+    locate(); draw();
+  };
+  function locate(){
+    if (me || !navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(p => { me = { lat: p.coords.latitude, lng: p.coords.longitude }; draw(); }, () => {}, { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 });
+  }
+  const dist = (a, b) => { if (!a || !b) return Infinity; const R = 6371e3, t = Math.PI / 180, dl = (b.lat - a.lat) * t, dn = (b.lng - a.lng) * t;
+    const h = Math.sin(dl / 2) ** 2 + Math.cos(a.lat * t) * Math.cos(b.lat * t) * Math.sin(dn / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(h)); };
+  const fmtD = m => m === Infinity ? '' : m < 1000 ? Math.round(m / 10) * 10 + 'm' : (m / 1000).toFixed(1) + 'km';
+  const label = (k, x) => k === 'hazard' ? (x.riskType || x.hKind || '위험') + (x.addr ? ' · ' + x.addr : '') : (x.name || x.addr || '');
+  function draw(){
+    const list = (D && D[cur]) || [], col = K[cur][1];
+    const rows = list.map(x => ({ x, p: posOf(x), d: dist(me, posOf(x)) })).sort((a, b) => ((a.p ? 0 : 1) - (b.p ? 0 : 1)) || ((a.d === b.d) ? 0 : (a.d - b.d)) || String(a.x.name || a.x.addr || '').localeCompare(String(b.x.name || b.x.addr || '')));
+    document.getElementById('lgx-list').innerHTML = rows.map((r, i) => '<div class="lgx-it' + (cur !== 'hazard' && !isUse(r.x) ? ' off' : '') + '" data-i="' + i + '"><b>' + E(label(cur, r.x)) + (cur !== 'hazard' && !isUse(r.x) ? ' (' + (r.x._t === 'rfid' ? '미사용' : '해지') + ')' : '') + '</b><span>' + (r.p ? fmtD(r.d) : '위치 없음') + '</span></div>').join('')
+      || '<div class="lgx-it"><b>이 대장에 자료가 없습니다</b></div>';
+    document.querySelectorAll('#lgx-list .lgx-it[data-i]').forEach(el => el.onclick = () => { const r = rows[+el.dataset.i]; card(r.x); if (lmap && r.p) lmap.panTo(new kakao.maps.LatLng(r.p.lat, r.p.lng)); });
+    if (!lmap) return;
+    pins.forEach(o => o.setMap(null)); pins = [];
+    const bd = new kakao.maps.LatLngBounds(); let n = 0;
+    rows.forEach(r => { if (!r.p) return;
+      const el = document.createElement('div'); el.className = 'lgx-pin'; el.style.background = (cur !== 'hazard' && !isUse(r.x)) ? '#9ca3af' : col;
+      el.textContent = cur === 'hazard' ? (r.x.riskType || '위험') : (r.x.name || '').slice(0, 10); el.onclick = () => card(r.x);
+      const ll = new kakao.maps.LatLng(r.p.lat, r.p.lng); pins.push(new kakao.maps.CustomOverlay({ map: lmap, position: ll, content: el, yAnchor: 1 })); bd.extend(ll); n++; });
+    if (me){ const el = document.createElement('div'); el.className = 'lgx-me'; if (meOv) meOv.setMap(null); meOv = new kakao.maps.CustomOverlay({ map: lmap, position: new kakao.maps.LatLng(me.lat, me.lng), content: el, yAnchor: .5 }); }
+    if (n) lmap.setBounds(bd);
+  }
+  function card(x){
+    const k = cur, rows = [];
+    const add = (l, v) => { if (v != null && String(v).trim() !== '') rows.push('<div class="lgx-row"><b>' + l + '</b><div>' + E(v) + '</div></div>'); };
+    if (k === 'hazard'){ add('구분', x.hKind || '사고재해예방'); add('번호', x.hazardNo); add('주소', x.addr); add('위험요인', x.riskType); add('내용', x.riskContent); add('등급', ({High:'높음',Medium:'보통',Low:'낮음'})[x.riskLevel] || x.riskLevel); add('점검일', x.inspDate); add('조치', x.actionNote); }
+    else { add('이름', x.name); add('주소', x.addr); add('상태', isUse(x) ? (x._t === 'rfid' ? '사용' : '계약 중') : (x._t === 'rfid' ? '미사용' : '해지')); add('모델', x.model); add('수거 요일', x.days); add('배출 품목', x.item); add('메모', x.note); }
+    const c = document.getElementById('lgx-card');
+    c.innerHTML = '<h4>' + E(K[k][0]) + ' · ' + E(k === 'hazard' ? (x.addr || '') : (x.name || '')) + '</h4>' + rows.join('')
+      + '<div style="display:flex;gap:8px;margin-top:10px"><button type="button" class="lgx-close" style="flex:1" onclick="document.getElementById(\'lgx-card\').classList.remove(\'on\')">닫기</button></div>';
+    c.classList.add('on');
+  }
+})();
+</script>
+
 </body>
 </html>
