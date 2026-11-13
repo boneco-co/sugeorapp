@@ -401,7 +401,7 @@ button{font-family:inherit;cursor:pointer;border:0}
   <!-- [11_13] [📋민원] — 민원처리앱으로 넘어가지 않고 수거앱 안 민원 화면 (자료: 종합예방관리대장 = 부장님 저장소 report/recs) -->
   <button type="button" class="hbtn" id="mw-btn" onclick="mwxOpen()" style="border-color:#0f7a86;color:#0f7a86">📋<span class="mw-t">민원</span></button>
   <button class="hbtn ic" id="worker" onclick="openWorker()">👤</button>
-  <span id="app-ver">v1113f</span>
+  <span id="app-ver">v1113g</span>
 </div>
 <div id="offbar"></div>
 <div id="viewbar" style="display:none;background:#fef3c7;color:#b45309;font-weight:800;font-size:14px;padding:8px 12px;justify-content:space-between;align-items:center;gap:8px">
@@ -3033,7 +3033,15 @@ async function checkGate(){
 #lgx-tabs button{white-space:nowrap;border:1px solid #d9e1e8;border-radius:999px;padding:6px 11px;font-size:13px;font-weight:800;background:#fff;color:#4b5563}
 #lgx-tabs button.on{color:#fff;border-color:transparent}
 #lgx-map{flex:1;min-height:200px}
-#lgx-list{max-height:34vh;overflow:auto;border-top:1px solid #e5e7eb}
+#lgx-list{overflow:auto;border-top:1px solid #e5e7eb;display:none;flex:1;min-height:0}
+/* [11_13f] 카카오맵처럼 — 목록은 아래 손잡이로 접혀 있고, 누르면 절반까지, 지도 누르면 다시 접힘 */
+#lgx-pane{position:fixed}
+#lgx-bs{position:absolute;left:0;right:0;bottom:0;z-index:5;background:#fff;border-radius:16px 16px 0 0;box-shadow:0 -6px 20px rgba(0,0,0,.16);display:flex;flex-direction:column;padding-bottom:env(safe-area-inset-bottom,0px)}
+#lgx-bs.open{height:50%}
+#lgx-bs.open #lgx-list{display:block}
+#lgx-hdl{display:grid;justify-items:center;gap:5px;padding:8px 0 10px;cursor:pointer;touch-action:none;user-select:none}
+#lgx-hdl i{width:42px;height:5px;border-radius:3px;background:#cbd5e1}
+#lgx-hdl b{font-size:14.5px}
 .lgx-it{display:flex;justify-content:space-between;gap:8px;padding:10px 12px;border-bottom:1px solid #f1f5f9;font-size:14px;cursor:pointer}
 .lgx-it span{color:#6b7280;white-space:nowrap;font-size:13px}
 .lgx-it.off{opacity:.55}
@@ -3063,7 +3071,7 @@ async function checkGate(){
   <div id="lgx-top"><button type="button" onclick="lgxBack()">← 작업 목록</button><b id="lgx-ttl"></b></div>
   <div id="lgx-tabs"></div>
   <div id="lgx-map"></div>
-  <div id="lgx-list"></div>
+  <div id="lgx-bs"><div id="lgx-hdl" onclick="lgxSheet()"><i></i><b id="lgx-hdlt">📋 목록</b></div><div id="lgx-list"></div></div>
 </div>
 <script>
 // ══ [11_13] 현장 민원 — 종합예방관리대장(부장님 저장소 minwon-c29c2 report/recs)의 민원을 실시간으로 받아 사진·메모·처리완료 ══
@@ -3260,8 +3268,16 @@ async function checkGate(){
   };
   window.lgxClose = () => document.getElementById('lgx-ov').classList.remove('on');
   window.lgxBack = () => { document.getElementById('lgx-pane').classList.remove('on'); document.getElementById('lgx-card').classList.remove('on'); };
+  // [11_13f] 아래 목록 접기·펴기 (손잡이 누르기 / 위·아래로 밀기 / 지도 누르면 접힘)
+  let lgxN = 0;
+  function hdlTxt(){ const o = document.getElementById('lgx-bs').classList.contains('open'); document.getElementById('lgx-hdlt').textContent = '📋 목록 ' + lgxN + (cur === 'hazard' ? '건' : '곳') + (me ? ' · 가까운 순' : '') + (o ? ' ▼' : ' ▲'); }
+  window.lgxSheet = function(open){ const b = document.getElementById('lgx-bs'); b.classList.toggle('open', open === undefined ? !b.classList.contains('open') : !!open); hdlTxt(); if (lmap) setTimeout(() => lmap.relayout(), 30); };
+  (function(){ const h = document.getElementById('lgx-hdl'); let y0 = null;
+    h.addEventListener('touchstart', e => { y0 = e.touches[0].clientY; }, { passive:true });
+    h.addEventListener('touchend', e => { if (y0 === null) return; const dy = e.changedTouches[0].clientY - y0; y0 = null; if (Math.abs(dy) > 30) { e.preventDefault(); lgxSheet(dy < 0); } });
+  })();
   window.lgxOpen = async function(k){
-    cur = k; lgxClose();
+    cur = k; lgxClose(); lgxSheet(false);
     document.getElementById('lgx-pane').classList.add('on');
     document.getElementById('lgx-ttl').textContent = K[k][0];
     document.getElementById('lgx-tabs').innerHTML = Object.keys(K).map(x => '<button type="button" data-k="' + x + '"' + (x === k ? ' class="on" style="background:' + K[x][1] + '"' : '') + '>' + K[x][0] + '</button>').join('');
@@ -3271,7 +3287,7 @@ async function checkGate(){
       if (!(window.kakao && kakao.maps && kakao.maps.Map)){ try { await _kakao(); } catch(e){} }
       if (window.kakao && kakao.maps && kakao.maps.Map) { lmap = new kakao.maps.Map(document.getElementById('lgx-map'), { center: new kakao.maps.LatLng(37.5068, 127.0885), level: 5 });
         // [11_13d] 지도 쪽을 누르면 아래에서 올라온 창(내역·점검·수정)이 닫힌다
-        kakao.maps.event.addListener(lmap, 'click', () => { if (Date.now() - _pinT > 400) document.getElementById('lgx-card').classList.remove('on'); }); }
+        kakao.maps.event.addListener(lmap, 'click', () => { if (Date.now() - _pinT > 400) { document.getElementById('lgx-card').classList.remove('on'); lgxSheet(false); } }); }
     } else setTimeout(() => lmap.relayout(), 30);
     locate(); draw();
   };
@@ -3288,7 +3304,8 @@ async function checkGate(){
     const rows = list.map(x => ({ x, p: posOf(x), d: dist(me, posOf(x)) })).sort((a, b) => a.d - b.d || String(a.x.name || a.x.addr || '').localeCompare(String(b.x.name || b.x.addr || '')));
     document.getElementById('lgx-list').innerHTML = rows.map((r, i) => '<div class="lgx-it' + (cur !== 'hazard' && !isUse(r.x) ? ' off' : '') + '" data-i="' + i + '"><b>' + E(label(cur, r.x)) + (cur !== 'hazard' && !isUse(r.x) ? ' (' + (r.x._t === 'rfid' ? '미사용' : '해지') + ')' : '') + '</b><span>' + (r.p ? fmtD(r.d) : '위치 없음') + '</span></div>').join('')
       || '<div class="lgx-it"><b>이 대장에 자료가 없습니다</b></div>';
-    document.querySelectorAll('#lgx-list .lgx-it[data-i]').forEach(el => el.onclick = () => { const r = rows[+el.dataset.i]; card(r.x); if (lmap && r.p) lmap.panTo(new kakao.maps.LatLng(r.p.lat, r.p.lng)); });
+    lgxN = rows.length; hdlTxt();
+    document.querySelectorAll('#lgx-list .lgx-it[data-i]').forEach(el => el.onclick = () => { const r = rows[+el.dataset.i]; lgxSheet(false); card(r.x); if (lmap && r.p) lmap.panTo(new kakao.maps.LatLng(r.p.lat, r.p.lng)); });
     if (!lmap) return;
     lgxRows = rows.filter(r => r.p);
     const bd = new kakao.maps.LatLngBounds(); let n = 0;
