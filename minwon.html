@@ -56,19 +56,25 @@ button{font-family:inherit;cursor:pointer}
 .chips2{display:flex;gap:6px;flex-wrap:wrap}.chips2 button{border:1.5px solid #d9e1e8;border-radius:999px;padding:7px 12px;font-size:14px;font-weight:800;background:#fff;color:#374151}.chips2 button.on{background:#0f7a86;border-color:#0f7a86;color:#fff}
 #gate-in,#car-in{border:1.5px solid #d9e1e8;border-radius:12px;padding:12px;font-size:17px;text-align:center}
 .go{border:0;border-radius:12px;background:#0f7a86;color:#fff;font-size:17px;font-weight:900;padding:13px}
+#mwx-logo{width:30px;height:30px;border-radius:50%;flex:none}
+.gate-logo{width:72px;height:72px;border-radius:50%;margin:0 auto}
+#app-ver{position:absolute;right:8px;bottom:2px;font-size:9px;font-weight:600;color:#94a3b8;line-height:1;pointer-events:none}
+#mwx-top{position:relative}
+#offbar{position:fixed;left:0;right:0;bottom:0;z-index:4500;background:#ea580c;color:#fff;font-size:13px;font-weight:800;padding:6px 12px calc(6px + env(safe-area-inset-bottom,0px));display:none;text-align:center}
 #who-chg{border:0;background:none;color:#0f7a86;font-size:12.5px;font-weight:800;padding:0 4px}
 </style>
 </head>
 <body>
 <div id="toast"></div>
-<div id="gate-ov" class="who-wrap"><div class="who-box"><h2>🔒 직원 비밀번호</h2><p>직원만 입력할 수 있습니다 (하루 한 번)</p><input id="gate-in" type="password" placeholder="직원 비밀번호 입력" autocomplete="current-password"><div id="gate-err" class="err"></div><button type="button" id="gate-go" class="go">확인</button></div></div>
-<div id="car-ov" class="who-wrap"><div class="who-box"><h2>🚛 차량 선택</h2><p>팀과 차량번호 뒤 4자리를 고르세요. 처리한 차량으로 남습니다.</p>
+<div id="gate-ov" class="who-wrap"><div class="who-box"><img class="gate-logo" src="icon-192.png" alt="본에코"><h2>🔒 직원 비밀번호</h2><p>직원만 입력할 수 있습니다 (하루 한 번)</p><input id="gate-in" type="password" placeholder="직원 비밀번호 입력" autocomplete="current-password"><div id="gate-err" class="err"></div><button type="button" id="gate-go" class="go">확인</button></div></div>
+<div id="car-ov" class="who-wrap"><div class="who-box"><img class="gate-logo" src="icon-192.png" alt="본에코"><h2>🚛 차량 선택</h2><p>팀과 차량번호 뒤 4자리를 고르세요. 처리한 차량으로 남습니다.</p>
   <div id="car-recent" class="chips2"></div>
   <div class="chips2" id="car-team"></div>
   <input id="car-in" inputmode="numeric" maxlength="4" placeholder="차량번호 뒤 4자리" autocomplete="off">
   <div id="car-err" class="err"></div><button type="button" id="car-go" class="go">시작</button></div></div>
 <div id="mwx-pane">
-  <div id="mwx-top"><button type="button" onclick="mwxClose()">🚛 수거로</button><b id="mwx-ttl">📋 민원</b></div>
+  <div id="mwx-top"><button type="button" onclick="mwxClose()">🚛 수거로</button><img id="mwx-logo" src="icon-192.png" alt="본에코"><b id="mwx-ttl">본에코 민원</b><span id="app-ver">v1113d</span></div>
+<div id="offbar">📴 오프라인 — 인터넷이 연결되면 자동으로 다시 받아요</div>
   <div class="mwx-chips" id="mwx-team"></div>
   <div class="mwx-seg" id="mwx-seg"><button type="button" class="on" data-f="open">미처리</button><button type="button" data-f="today">오늘 처리</button><button type="button" data-f="all">전체</button></div>
   <div id="mwx-map"></div>
@@ -204,7 +210,7 @@ function _mwFeed(v){ const n = Object.keys(v || {}).length; if (_lastN >= 0 && n
   function bindFile(){ const fi = document.getElementById('mwx-file'); if (!fi || fi._b) return; fi._b = 1; fi.addEventListener('change', async e => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (!f || !phWhich) return;
     try { const d = await shrink(f); ph[phWhich] = d; showPh(phWhich, d); } catch(err){ if (typeof toast === 'function') toast('⚠️ ' + err.message); } }); }
   async function save(){
-    const r = sel; if (!r) return; const btn = document.getElementById('mwx-done'); btn.disabled = true; btn.textContent = '저장 중…';
+    const r = sel; if (!r) return; if (!navigator.onLine) { toast('📴 오프라인이에요 — 인터넷이 연결되면 다시 눌러 주세요'); return; } const btn = document.getElementById('mwx-done'); btn.disabled = true; btn.textContent = '저장 중…';
     try {
       const a = db(), memo = (document.getElementById('mwx-memo').value || '').trim(), t = nowS();
       for (const w of Object.keys(ph)) await a.database().ref('report/photos/' + r.id + '/' + w).set(ph[w]);
@@ -216,6 +222,11 @@ function _mwFeed(v){ const n = Object.keys(v || {}).length; if (_lastN >= 0 && n
       document.getElementById('mwx-card').classList.remove('on');
     } catch(e){ if (typeof toast === 'function') toast('❌ 저장 실패: ' + e.message); btn.disabled = false; btn.textContent = '✅ 처리완료'; }
   }
+  // [11_13d] 대형수거앱 규칙: 자정 넘으면 '오늘 처리' 다시 계산, 오래 꺼뒀다 켜면 연결 다시 붙이기
+  window.mwxRefresh = () => { try { if (document.getElementById('mwx-pane').classList.contains('on')) render(); } catch(e){} };
+  window.mwxReconnect = () => { try { const d = db().database(); d.goOffline(); d.goOnline(); } catch(e){} };
+  window.mwxCardOpen = () => document.getElementById('mwx-card').classList.contains('on');
+  window.mwxCardClose = () => document.getElementById('mwx-card').classList.remove('on');
   // 알림(숫자·깜빡임)은 화면을 안 열어도 받는다
   setTimeout(() => { try { sub(); } catch(e){} }, 1500);
 })();
@@ -256,19 +267,56 @@ function _mwFeed(v){ const n = Object.keys(v || {}).length; if (_lastN >= 0 && n
     const v = ($('gate-in').value || '').trim(), err = $('gate-err');
     if (!v) { err.textContent = '비밀번호를 입력해 주세요'; return; }
     err.textContent = '확인 중…';
-    try { await firebase.auth().signInWithEmailAndPassword(STAFF_EMAIL, v); lsS(GATE, ymd()); err.textContent = ''; $('gate-ov').classList.remove('on'); if (car()) start(); else openCar(); }
-    catch(e){ err.textContent = errMsg(e); $('gate-in').value = ''; }
+    try { await firebase.auth().signInWithEmailAndPassword(STAFF_EMAIL, v); }
+    catch(e){ err.textContent = errMsg(e); $('gate-in').value = ''; return; }
+    // 하루 첫 통과: 새로고침 → 서버에서 최신 민원 목록을 다시 받음 (차량·팀은 유지)
+    lsS(GATE, ymd()); err.textContent = ''; location.reload();
   }
-  function start(){ showCar(); mwxOpen(); }
+  function start(){ showCar(); armBackGuard(); mwxOpen(); }
   $('gate-go').onclick = checkGate; $('gate-in').addEventListener('keydown', e => { if (e.key === 'Enter') checkGate(); });
   $('car-go').onclick = saveCar; $('car-in').addEventListener('keydown', e => { if (e.key === 'Enter') saveCar(); });
   chg.onclick = openCar;
   showCar();
   const off = firebase.auth().onAuthStateChanged(function(u){ off();
     const staff = !!(u && !u.isAnonymous && u.email === STAFF_EMAIL);
+    if (!staff) { try { localStorage.removeItem(GATE); } catch(e){} }   // 로그인이 풀렸으면 오늘 통과도 무효 → 비밀번호 창
     if (lsG(GATE, '') === ymd() && staff) { if (car()) start(); else openCar(); }
     else { $('gate-ov').classList.add('on'); setTimeout(() => $('gate-in').focus(), 150); }
   });
+
+  // ── 대형수거앱과 같은 규칙 ──
+  // 뒤로가기: 처리 창이 열려 있으면 그것만 닫고, 맨 위 화면에서는 한 번 더 눌러야 종료
+  let exitArmed = false, exitT = null, armed = false;
+  function armBackGuard(){
+    if (armed) return; armed = true;
+    history.replaceState({ root:true }, ''); history.pushState({ root:true }, '');
+    window.addEventListener('popstate', () => {
+      if ($('car-ov').classList.contains('on') && car()) { $('car-ov').classList.remove('on'); history.pushState({ root:true }, ''); return; }
+      if (window.mwxCardOpen && mwxCardOpen()) { mwxCardClose(); history.pushState({ root:true }, ''); return; }
+      if (exitArmed) return;
+      exitArmed = true; toast('한 번 더 뒤로가면 앱이 종료됩니다'); history.pushState({ root:true }, '');
+      clearTimeout(exitT); exitT = setTimeout(() => { exitArmed = false; }, 2000);
+    });
+  }
+  // 오프라인 표시
+  const offbar = () => { $('offbar').style.display = navigator.onLine ? 'none' : 'block'; };
+  window.addEventListener('online', () => { offbar(); if (window.mwxReconnect) mwxReconnect(); });
+  window.addEventListener('offline', offbar); offbar();
+  // 자정을 넘기면 '오늘 처리' 다시 계산
+  let day = ymd();
+  function refreshDay(){ const n = ymd(); if (n !== day) { day = n; if (window.mwxRefresh) mwxRefresh(); } }
+  setInterval(refreshDay, 60000);
+  // 화면을 다시 켜면: 날짜 확인, 20분 넘게 꺼져 있었으면 연결 다시 붙여 최신 자료 받기
+  let hiddenAt = 0, lastVis = 0;
+  function onAppVisible(){
+    const now = Date.now(); if (now - lastVis < 3000) return; lastVis = now;
+    refreshDay();
+    const longAway = hiddenAt && (now - hiddenAt > 20 * 60000); hiddenAt = 0;
+    if (longAway && window.mwxReconnect) mwxReconnect();
+  }
+  document.addEventListener('visibilitychange', () => { if (document.hidden) hiddenAt = Date.now(); else onAppVisible(); });
+  window.addEventListener('focus', onAppVisible);
+  window.addEventListener('pageshow', onAppVisible);
 })();
 </script>
 </body>
