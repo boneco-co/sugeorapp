@@ -401,7 +401,7 @@ button{font-family:inherit;cursor:pointer;border:0}
   <!-- [10_28] 전환 버튼 — 민원 현장앱을 새 탭(이름 고정)으로 연다. 수거앱 화면은 그대로 둔다 -->
   <a class="hbtn" id="mw-btn" href="https://boneco-minwon.web.app/?from=sugeo" target="bn_minwon" rel="noopener" style="text-decoration:none;border-color:#0f7a86;color:#0f7a86">📋<span class="mw-t">민원</span></a>
   <button class="hbtn ic" id="worker" onclick="openWorker()">👤</button>
-  <span id="app-ver">v1113a</span>
+  <span id="app-ver">v1113b</span>
 </div>
 <div id="offbar"></div>
 <div id="viewbar" style="display:none;background:#fef3c7;color:#b45309;font-weight:800;font-size:14px;padding:8px 12px;justify-content:space-between;align-items:center;gap:8px">
@@ -3117,14 +3117,50 @@ async function checkGate(){
       || '<div class="lgx-it"><b>이 대장에 자료가 없습니다</b></div>';
     document.querySelectorAll('#lgx-list .lgx-it[data-i]').forEach(el => el.onclick = () => { const r = rows[+el.dataset.i]; card(r.x); if (lmap && r.p) lmap.panTo(new kakao.maps.LatLng(r.p.lat, r.p.lng)); });
     if (!lmap) return;
-    pins.forEach(o => o.setMap(null)); pins = [];
+    lgxRows = rows.filter(r => r.p);
     const bd = new kakao.maps.LatLngBounds(); let n = 0;
-    rows.forEach(r => { if (!r.p) return;
-      const el = document.createElement('div'); el.className = 'lgx-pin'; el.style.background = (cur !== 'hazard' && !isUse(r.x)) ? '#9ca3af' : col;
-      el.textContent = cur === 'hazard' ? (r.x.riskType || '위험') : (r.x.name || '').slice(0, 10); el.onclick = () => card(r.x);
-      const ll = new kakao.maps.LatLng(r.p.lat, r.p.lng); pins.push(new kakao.maps.CustomOverlay({ map: lmap, position: ll, content: el, yAnchor: 1 })); bd.extend(ll); n++; });
+    lgxRows.forEach(r => { bd.extend(new kakao.maps.LatLng(r.p.lat, r.p.lng)); n++; });
+    if (!lmap._lgxIdle) { lmap._lgxIdle = 1; kakao.maps.event.addListener(lmap, 'idle', drawPins); }
     if (me){ const el = document.createElement('div'); el.className = 'lgx-me'; if (meOv) meOv.setMap(null); meOv = new kakao.maps.CustomOverlay({ map: lmap, position: new kakao.maps.LatLng(me.lat, me.lng), content: el, yAnchor: .5 }); }
     if (n) lmap.setBounds(bd);
+    drawPins();
+  }
+  // [11_13] 종합예방관리대장처럼 — 지도 자료 50곳 이상이면 멀리(레벨 4↑)는 원+숫자로 뭉치고, 가까이는 핀. 50곳 미만이면 늘 핀
+  let lgxRows = [];
+  const pinCol = x => (cur !== 'hazard' && !isUse(x)) ? '#9ca3af' : K[cur][1];
+  function cluDonut(cols, total){
+    const size = total >= 50 ? 64 : total >= 10 ? 56 : 48, dpr = window.devicePixelRatio || 1, cv = document.createElement('canvas');
+    cv.width = size * dpr; cv.height = size * dpr; cv.style.width = size + 'px'; cv.style.height = size + 'px';
+    const g = cv.getContext('2d'); g.scale(dpr, dpr); const c = size / 2, R = c - 2, ring = Math.max(6, size * 0.17);
+    g.beginPath(); g.arc(c, c, R, 0, Math.PI * 2); g.fillStyle = 'rgba(15,23,42,.30)'; g.fill();
+    let a = -Math.PI / 2; Object.keys(cols).forEach(k => { const sw = cols[k] / total * Math.PI * 2; g.beginPath(); g.arc(c, c, R - ring / 2, a, a + sw); g.strokeStyle = k; g.lineWidth = ring; g.stroke(); a += sw; });
+    g.beginPath(); g.arc(c, c, R - ring, 0, Math.PI * 2); g.fillStyle = '#fff'; g.fill();
+    g.fillStyle = '#0f172a'; g.font = '800 ' + (total >= 100 ? 15 : total >= 10 ? 17 : 19) + 'px -apple-system,sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(String(total), c, c + .5);
+    return cv;
+  }
+  function drawPins(){
+    if (!lmap) return;
+    pins.forEach(o => o.setMap(null)); pins = [];
+    const pts = lgxRows; if (!pts.length) return;
+    const pin = r => { const el = document.createElement('div'); el.className = 'lgx-pin'; el.style.background = pinCol(r.x);
+      el.textContent = cur === 'hazard' ? (r.x.riskType || '위험') : (r.x.name || '').slice(0, 10); el.onclick = () => card(r.x);
+      pins.push(new kakao.maps.CustomOverlay({ map: lmap, position: new kakao.maps.LatLng(r.p.lat, r.p.lng), content: el, yAnchor: 1 })); };
+    const b = lmap.getBounds(), sw = b.getSouthWest(), ne = b.getNorthEast(), el = document.getElementById('lgx-map'), lv = lmap.getLevel();
+    const inView = pts.filter(r => r.p.lat >= sw.getLat() && r.p.lat <= ne.getLat() && r.p.lng >= sw.getLng() && r.p.lng <= ne.getLng()).length;
+    if (pts.length < 50 || lv <= 2 || (lv === 3 && inView <= 40)) { pts.forEach(pin); return; }
+    const dLat = (ne.getLat() - sw.getLat()) / (el.clientHeight || 600), dLng = (ne.getLng() - sw.getLng()) / (el.clientWidth || 600);
+    if (!(dLat > 0 && dLng > 0)) { pts.forEach(pin); return; }
+    const bins = {}; pts.forEach(r => { const k = Math.floor(r.p.lat / (dLat * 95)) + '_' + Math.floor(r.p.lng / (dLng * 95)); (bins[k] = bins[k] || []).push(r); });
+    const cen = g => { const n = g.rows.length; g.lat = g.rows.reduce((s, r) => s + (+r.p.lat), 0) / n; g.lng = g.rows.reduce((s, r) => s + (+r.p.lng), 0) / n; return g; };
+    const merged = []; Object.values(bins).map(r => cen({ rows: r })).sort((a, b) => b.rows.length - a.rows.length).forEach(g => {
+      const near = merged.find(m => Math.hypot((m.lat - g.lat) / dLat, (m.lng - g.lng) / dLng) < 78); if (near) { near.rows = near.rows.concat(g.rows); cen(near); } else merged.push(g); });
+    merged.forEach(g => {
+      if (g.rows.length === 1) { pin(g.rows[0]); return; }
+      const cols = {}; g.rows.forEach(r => { const c = pinCol(r.x); cols[c] = (cols[c] || 0) + 1; });
+      const box = document.createElement('div'); box.style.cssText = 'cursor:pointer;filter:drop-shadow(0 2px 4px rgba(0,0,0,.25))'; box.appendChild(cluDonut(cols, g.rows.length));
+      box.onclick = () => lmap.setLevel(Math.max(2, lmap.getLevel() - 2), { anchor: new kakao.maps.LatLng(g.lat, g.lng) });
+      pins.push(new kakao.maps.CustomOverlay({ map: lmap, position: new kakao.maps.LatLng(g.lat, g.lng), content: box, xAnchor: .5, yAnchor: .5, zIndex: 4 }));
+    });
   }
   // ── 점검 창: 사진 · 칸 고치기 · 이상 없음/있음 · 메모 · [변경 기록] → 종합예방관리대장에 저장, 이력(hist)으로 쌓임 ──
   const refOf = (k, x) => db().database().ref(k === 'hazard' ? 'report/recs/' + x.id : (x._t === 'rfid' ? 'report/rfid/' : 'report/biz/') + x.id);
