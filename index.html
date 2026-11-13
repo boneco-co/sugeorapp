@@ -401,7 +401,7 @@ button{font-family:inherit;cursor:pointer;border:0}
   <!-- [11_13] [📋민원] — 민원처리앱으로 넘어가지 않고 수거앱 안 민원 화면 (자료: 종합예방관리대장 = 부장님 저장소 report/recs) -->
   <button type="button" class="hbtn" id="mw-btn" onclick="mwxOpen()" style="border-color:#0f7a86;color:#0f7a86">📋<span class="mw-t">민원</span></button>
   <button class="hbtn ic" id="worker" onclick="openWorker()">👤</button>
-  <span id="app-ver">v1113c</span>
+  <span id="app-ver">v1113d</span>
 </div>
 <div id="offbar"></div>
 <div id="viewbar" style="display:none;background:#fef3c7;color:#b45309;font-weight:800;font-size:14px;padding:8px 12px;justify-content:space-between;align-items:center;gap:8px">
@@ -3264,7 +3264,9 @@ async function checkGate(){
     await load();
     if (!lmap){
       if (!(window.kakao && kakao.maps && kakao.maps.Map)){ try { await _kakao(); } catch(e){} }
-      if (window.kakao && kakao.maps && kakao.maps.Map) lmap = new kakao.maps.Map(document.getElementById('lgx-map'), { center: new kakao.maps.LatLng(37.5068, 127.0885), level: 5 });
+      if (window.kakao && kakao.maps && kakao.maps.Map) { lmap = new kakao.maps.Map(document.getElementById('lgx-map'), { center: new kakao.maps.LatLng(37.5068, 127.0885), level: 5 });
+        // [11_13d] 지도 쪽을 누르면 아래에서 올라온 창(내역·점검·수정)이 닫힌다
+        kakao.maps.event.addListener(lmap, 'click', () => { if (Date.now() - _pinT > 400) document.getElementById('lgx-card').classList.remove('on'); }); }
     } else setTimeout(() => lmap.relayout(), 30);
     locate(); draw();
   };
@@ -3292,7 +3294,9 @@ async function checkGate(){
     drawPins();
   }
   // [11_13] 종합예방관리대장처럼 — 지도 자료 50곳 이상이면 멀리(레벨 4↑)는 원+숫자로 뭉치고, 가까이는 핀. 50곳 미만이면 늘 핀
-  let lgxRows = [];
+  let lgxRows = [], _pinT = 0;
+  // [11_13d] 재해예방 핀 = 주소 (동 + 번지)
+  const shortAddr = x => String(x.addr || x.riskType || '위험').replace(/서울(특별시)?\s*|송파구\s*/g, '').replace(/번지/g, '').replace(/(동|가)(\d)/, '$1 $2').replace(/\s+/g, ' ').trim().slice(0, 14);
   const pinCol = x => (cur !== 'hazard' && !isUse(x)) ? '#9ca3af' : K[cur][1];
   function cluDonut(cols, total){
     const size = total >= 50 ? 64 : total >= 10 ? 56 : 48, dpr = window.devicePixelRatio || 1, cv = document.createElement('canvas');
@@ -3309,7 +3313,7 @@ async function checkGate(){
     pins.forEach(o => o.setMap(null)); pins = [];
     const pts = lgxRows; if (!pts.length) return;
     const pin = r => { const el = document.createElement('div'); el.className = 'lgx-pin'; el.style.background = pinCol(r.x);
-      el.textContent = cur === 'hazard' ? (r.x.riskType || '위험') : (r.x.name || '').slice(0, 10); el.onclick = () => card(r.x);
+      el.textContent = cur === 'hazard' ? shortAddr(r.x) : (r.x.name || '').slice(0, 10); el.onclick = ev => { _pinT = Date.now(); if (ev) ev.stopPropagation(); card(r.x); };
       pins.push(new kakao.maps.CustomOverlay({ map: lmap, position: new kakao.maps.LatLng(r.p.lat, r.p.lng), content: el, yAnchor: 1 })); };
     const b = lmap.getBounds(), sw = b.getSouthWest(), ne = b.getNorthEast(), el = document.getElementById('lgx-map'), lv = lmap.getLevel();
     const inView = pts.filter(r => r.p.lat >= sw.getLat() && r.p.lat <= ne.getLat() && r.p.lng >= sw.getLng() && r.p.lng <= ne.getLng()).length;
@@ -3348,6 +3352,7 @@ async function checkGate(){
     const hist = Object.values(x.hist || {}).sort((a, b) => String(b.at).localeCompare(String(a.at))).slice(0, 8);
     c.innerHTML = '<h4>' + E(K[k][0]) + ' · ' + E(k === 'hazard' ? (x.addr || '') : (x.name || '')) + ' <span style="font-size:12px;color:#0f7a86">' + E(st) + '</span></h4>'
       + '<div style="font-size:13px;color:#6b7280">' + E(x.addr || '') + (x.lastInsp ? ' · 최근 점검 ' + E(x.lastInsp.at) + ' ' + E(x.lastInsp.by || '') : '') + '</div>'
+      + (k === 'hazard' ? hzInfo(x) : '')
       + '<div class="lgx-ph" id="lgx-ph"><label>📷<br>사진 찍기<input type="file" accept="image/*" capture="environment" multiple style="display:none" id="lgx-phin"></label></div>'
       + (fl ? '<div class="lgx-two">' + fl + '</div>' : '')
       + '<div class="lgx-ok"><button type="button" data-ok="1" class="g">✅ 이상 없음</button><button type="button" data-ok="0" class="r">⚠️ 이상 있음</button></div>'
@@ -3365,6 +3370,13 @@ async function checkGate(){
     // 지난 사진 몇 장 (읽기만)
     phRefOf(k, x).limitToLast(3).once('value').then(s => { const v = s.val() || {}; const box = c.querySelector('#lgx-ph'); if (!box || cx !== x) return;
       Object.values(v).forEach(b => { if (typeof b === 'string' && b.indexOf('data:image') === 0){ const im = document.createElement('img'); im.src = b; im.style.opacity = '.6'; im.title = '지난 사진'; box.appendChild(im); } }); }).catch(() => {});
+  }
+  // [11_13d] 재해예방 내역 (종합예방관리대장에 적힌 내용 그대로, 읽기만) + 처리 전·후 사진
+  function hzInfo(x){
+    const R = [['관리번호', x.hazardNo], ['위험 유형', x.riskType], ['위험도', x.riskLevel], ['위험 내용', x.riskContent], ['조치 내용', x.action], ['점검일', x.inspDate], ['점검 결과', x.inspResult], ['담당', x.staff || x.driver], ['비고', x.note]];
+    setTimeout(() => db().database().ref('report/photos/' + x.id).once('value').then(s => { const v = s.val() || {}, box = document.getElementById('lgx-hzph'); if (!box || cx !== x) return;
+      ['before', 'after'].forEach(w => { if (typeof v[w] === 'string' && v[w].indexOf('data:image') === 0) box.insertAdjacentHTML('beforeend', '<figure style="margin:0;text-align:center;font-size:11px;color:#6b7280"><img src="' + v[w] + '" alt="">' + (w === 'before' ? '처리 전' : '처리 후') + '</figure>'); }); }).catch(() => {}), 0);
+    return '<div style="margin:8px 0 4px">' + R.filter(r => String(r[1] || '').trim()).map(r => '<div class="lgx-row"><b>' + r[0] + '</b><span>' + E(r[1]) + '</span></div>').join('') + '</div><div class="lgx-ph" id="lgx-hzph"></div>';
   }
   async function save(k, x){
     if (_view()){ _t('👀 보기 모드라 저장할 수 없어요'); return; }
