@@ -73,7 +73,7 @@ button{font-family:inherit;cursor:pointer}
   <input id="car-in" inputmode="numeric" maxlength="4" placeholder="차량번호 뒤 4자리" autocomplete="off">
   <div id="car-err" class="err"></div><button type="button" id="car-go" class="go">시작</button></div></div>
 <div id="mwx-pane">
-  <div id="mwx-top"><button type="button" onclick="mwxClose()">🚛 수거로</button><img id="mwx-logo" src="icon-192.png" alt="본에코"><b id="mwx-ttl">본에코 민원</b><span id="app-ver">v1113d</span></div>
+  <div id="mwx-top"><button type="button" onclick="mwxClose()">🚛 수거로</button><img id="mwx-logo" src="icon-192.png" alt="본에코"><b id="mwx-ttl">본에코 민원</b><span id="app-ver">v1113e</span></div>
 <div id="offbar">📴 오프라인 — 인터넷이 연결되면 자동으로 다시 받아요</div>
   <div class="mwx-chips" id="mwx-team"></div>
   <div class="mwx-seg" id="mwx-seg"><button type="button" class="on" data-f="open">미처리</button><button type="button" data-f="today">오늘 처리</button><button type="button" data-f="all">전체</button></div>
@@ -102,7 +102,10 @@ function _mwFeed(v){ const n = Object.keys(v || {}).length; if (_lastN >= 0 && n
   const ymd = d => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
   const nowS = () => { const d = new Date(); return ymd(d) + ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0'); };
   const who = () => { try { return (localStorage.getItem('worker') || '').trim() || '현장'; } catch(e){ return '현장'; } };
-  const col = r => COL[r.subtype] || COL.기타, done = r => r.status === '처리완료';
+  // [11_13j] 분류: 공용용기는 음식물, 특수마대·기타 등은 생활 (대장과 같음)
+  const cat = t => { t = String(t || ''); return t === '음식물' || t === '공용용기' ? '음식물' : t === '재활용' ? '재활용' : '생활'; };
+  const catL = t => { const c = cat(t); return t && t !== c ? c + '·' + t : c; };
+  const col = r => COL[cat(r.subtype)], done = r => r.status === '처리완료';
   const posOf = r => r.pos && r.pos.lat ? r.pos : (r.addrPos && r.addrPos.lat ? r.addrPos : null);
   let app = null, REF = null, RECS = {}, team = lsG('mwx_team', '전체'), flt = 'open', map = null, pins = [], rows = [], sel = null, ph = {}, phWhich = '';
   function db(){ if (!app) app = firebase.apps.find(a => a.name === 'boss') || firebase.initializeApp(BOSS, 'boss'); return app; }
@@ -145,7 +148,7 @@ function _mwFeed(v){ const n = Object.keys(v || {}).length; if (_lastN >= 0 && n
       .sort((a, b) => String((b.date||'') + (b.time||'')).localeCompare(String((a.date||'') + (a.time||''))));
     const L = document.getElementById('mwx-list');
     L.innerHTML = rows.slice(0, 300).map((r, i) => '<div class="mwx-it" data-i="' + i + '" style="border-left-color:' + col(r) + '"><div class="r1"><b>' + E(r.addr || '주소 없음') + '</b><span class="mwx-st ' + (done(r) ? 'd">처리완료' : 'w">미처리') + '</span></div>'
-      + '<div class="tx"><span class="mwx-tag" style="background:' + col(r) + ';color:' + (col(r) === '#facc15' ? '#422006' : '#fff') + '">' + E(r.subtype || '민원') + '</span>' + E(String(r.content || r.category || '').slice(0, 80)) + '</div>'
+      + '<div class="tx"><span class="mwx-tag" style="background:' + col(r) + ';color:' + (col(r) === '#facc15' ? '#422006' : '#fff') + '">' + E(catL(r.subtype)) + '</span>' + E(String(r.content || r.category || '').slice(0, 80)) + '</div>'
       + '<div class="mt"><span>' + E(String(r.date || '').slice(5)) + ' ' + E(r.time || '') + ' 접수</span><span>' + E(r.team || '') + '</span></div></div>').join('')
       || '<div style="padding:14px;color:#6b7280;font-size:14px">' + (flt === 'open' ? '미처리 민원이 없습니다 ✅' : '해당하는 민원이 없습니다') + '</div>';
     L.querySelectorAll('.mwx-it').forEach(el => el.onclick = () => { const r = rows[+el.dataset.i]; card(r); const p = posOf(r); if (map && p) map.panTo(new kakao.maps.LatLng(p.lat, p.lng)); });
@@ -190,7 +193,7 @@ function _mwFeed(v){ const n = Object.keys(v || {}).length; if (_lastN >= 0 && n
     sel = r; ph = {};
     const c = document.getElementById('mwx-card'), p = posOf(r);
     c.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b style="font-size:17px">' + E(r.addr || '주소 없음') + '</b><button type="button" id="mwx-x" style="border:0;background:#f1f5f9;border-radius:50%;width:32px;height:32px;font-size:16px">✕</button></div>'
-      + '<div class="kv"><b>민원</b><div><span class="mwx-tag" style="background:' + col(r) + ';color:' + (col(r) === '#facc15' ? '#422006' : '#fff') + '">' + E(r.subtype || '민원') + '</span>' + E(r.content || r.category || '') + '</div></div>'
+      + '<div class="kv"><b>민원</b><div><span class="mwx-tag" style="background:' + col(r) + ';color:' + (col(r) === '#facc15' ? '#422006' : '#fff') + '">' + E(catL(r.subtype)) + '</span>' + E(r.content || r.category || '') + '</div></div>'
       + (r.tel ? '<div class="kv"><b>연락처</b><div>' + E(r.tel) + '</div></div>' : '')
       + '<div class="kv"><b>접수</b><div>' + E(r.date || '') + ' ' + E(r.time || '') + ' · ' + E(r.team || '') + (r.no ? ' · ' + E(r.no) : '') + '</div></div>'
       + (p ? '<div class="kv"><b>위치</b><div><a href="https://map.kakao.com/link/to/' + encodeURIComponent(r.addr || '민원') + ',' + p.lat + ',' + p.lng + '" target="_blank" rel="noopener" style="color:#0f7a86;font-weight:800">🗺️ 길찾기</a></div></div>' : '')
