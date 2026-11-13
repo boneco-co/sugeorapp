@@ -401,7 +401,7 @@ button{font-family:inherit;cursor:pointer;border:0}
   <!-- [11_13] [📋민원] — 민원처리앱으로 넘어가지 않고 수거앱 안 민원 화면 (자료: 종합예방관리대장 = 부장님 저장소 report/recs) -->
   <button type="button" class="hbtn" id="mw-btn" onclick="mwxOpen()" style="border-color:#0f7a86;color:#0f7a86">📋<span class="mw-t">민원</span></button>
   <button class="hbtn ic" id="worker" onclick="openWorker()">👤</button>
-  <span id="app-ver">v1113g</span>
+  <span id="app-ver">v1113h</span>
 </div>
 <div id="offbar"></div>
 <div id="viewbar" style="display:none;background:#fef3c7;color:#b45309;font-weight:800;font-size:14px;padding:8px 12px;justify-content:space-between;align-items:center;gap:8px">
@@ -3074,6 +3074,17 @@ async function checkGate(){
   <div id="lgx-bs"><div id="lgx-hdl" onclick="lgxSheet()"><i></i><b id="lgx-hdlt">📋 목록</b></div><div id="lgx-list"></div></div>
 </div>
 <script>
+// [11_13h] 주소 표기 통일 (종합예방관리대장과 같은 규칙) — 서울·송파구·번지 빼고, 본/잠실본동→잠실동, 삼→삼전동, 번지 앞 0 제거, 번지만 있으면 그 건의 동을 붙임
+function bnAddr(s, dong){
+  s = String(s || '').replace(/서울(특별시)?\s*/g, '').replace(/송파구\s*/g, '').replace(/번지/g, '').trim();
+  const nb = n => { const m = String(n).replace(/\s/g, '').match(/^0*(\d{1,4})(?:-0*(\d{0,4}))?$/); return m ? m[1] + (m[2] && +m[2] ? '-' + (+m[2]) : '') : String(n).replace(/\s/g, ''); };
+  s = s.replace(/(^|[^가-힣A-Za-z])(?:잠실본동|잠실동|본)\s*(\d+(?:\s*-\s*\d+)?)/g, (m, a, n) => a + '잠실동 ' + nb(n));
+  s = s.replace(/(^|[^가-힣A-Za-z])(?:삼전동|삼)\s*(\d+(?:\s*-\s*\d+)?)/g, (m, a, n) => a + '삼전동 ' + nb(n));
+  if (/^\d{1,4}(?:\s*-\s*\d{1,4})?$/.test(s)) { const d = /삼전/.test(dong || '') ? '삼전동' : (/잠실/.test(dong || '') ? '잠실동' : ''); s = (d ? d + ' ' : '') + nb(s); }
+  return s.replace(/\s+/g, ' ');
+}
+</script>
+<script>
 // ══ [11_13] 현장 민원 — 종합예방관리대장(부장님 저장소 minwon-c29c2 report/recs)의 민원을 실시간으로 받아 사진·메모·처리완료 ══
 (function(){
   const BOSS = { apiKey:'AIzaSyCrJaARREMDXFfhicjUwWFyqkyTbVMRsYk', authDomain:'minwon-c29c2.firebaseapp.com', databaseURL:'https://minwon-c29c2-default-rtdb.asia-southeast1.firebasedatabase.app', projectId:'minwon-c29c2' };
@@ -3129,7 +3140,7 @@ async function checkGate(){
     rows = all.filter(r => flt === 'open' ? !done(r) : flt === 'today' ? (done(r) && String(r.doneAt || r.updatedAt || '').slice(0,10) === t) : true)
       .sort((a, b) => String((b.date||'') + (b.time||'')).localeCompare(String((a.date||'') + (a.time||''))));
     const L = document.getElementById('mwx-list');
-    L.innerHTML = rows.slice(0, 300).map((r, i) => '<div class="mwx-it" data-i="' + i + '" style="border-left-color:' + col(r) + '"><div class="r1"><b>' + E(r.addr || '주소 없음') + '</b><span class="mwx-st ' + (done(r) ? 'd">처리완료' : 'w">미처리') + '</span></div>'
+    L.innerHTML = rows.slice(0, 300).map((r, i) => '<div class="mwx-it" data-i="' + i + '" style="border-left-color:' + col(r) + '"><div class="r1"><b>' + E(bnAddr(r.addr, r.dong) || '주소 없음') + '</b><span class="mwx-st ' + (done(r) ? 'd">처리완료' : 'w">미처리') + '</span></div>'
       + '<div class="tx"><span class="mwx-tag" style="background:' + col(r) + ';color:' + (col(r) === '#facc15' ? '#422006' : '#fff') + '">' + E(catL(r.subtype)) + '</span>' + E(String(r.content || r.category || '').slice(0, 80)) + '</div>'
       + '<div class="mt"><span>' + E(String(r.date || '').slice(5)) + ' ' + E(r.time || '') + ' 접수</span><span>' + E(r.team || '') + '</span></div></div>').join('')
       || '<div style="padding:14px;color:#6b7280;font-size:14px">' + (flt === 'open' ? '미처리 민원이 없습니다 ✅' : '해당하는 민원이 없습니다') + '</div>';
@@ -3151,7 +3162,7 @@ async function checkGate(){
     if (!map) return; pins.forEach(o => o.setMap(null)); pins = [];
     const pts = rows.filter(posOf); if (!pts.length) return;
     const pin = r => { const p = posOf(r), el = document.createElement('div'); el.className = 'mwx-pin'; el.style.borderColor = col(r); el.style.color = col(r) === '#facc15' ? '#854d0e' : col(r);
-      el.textContent = String(r.addr || '').replace(/서울(특별시)?\s*|송파구\s*/g, '').slice(0, 14) || '민원'; el.onclick = () => card(r);
+      el.textContent = bnAddr(r.addr, r.dong).slice(0, 16) || '민원'; el.onclick = () => card(r);
       pins.push(new kakao.maps.CustomOverlay({ map, position: new kakao.maps.LatLng(p.lat, p.lng), content: el, yAnchor: 1 })); };
     const b = map.getBounds(), sw = b.getSouthWest(), ne = b.getNorthEast(), el = document.getElementById('mwx-map'), lv = map.getLevel();
     const inView = pts.filter(r => { const p = posOf(r); return p.lat >= sw.getLat() && p.lat <= ne.getLat() && p.lng >= sw.getLng() && p.lng <= ne.getLng(); }).length;
@@ -3174,7 +3185,7 @@ async function checkGate(){
   function card(r){
     sel = r; ph = {};
     const c = document.getElementById('mwx-card'), p = posOf(r);
-    c.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b style="font-size:17px">' + E(r.addr || '주소 없음') + '</b><button type="button" id="mwx-x" style="border:0;background:#f1f5f9;border-radius:50%;width:32px;height:32px;font-size:16px">✕</button></div>'
+    c.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b style="font-size:17px">' + E(bnAddr(r.addr, r.dong) || '주소 없음') + '</b><button type="button" id="mwx-x" style="border:0;background:#f1f5f9;border-radius:50%;width:32px;height:32px;font-size:16px">✕</button></div>'
       + '<div class="kv"><b>민원</b><div><span class="mwx-tag" style="background:' + col(r) + ';color:' + (col(r) === '#facc15' ? '#422006' : '#fff') + '">' + E(catL(r.subtype)) + '</span>' + E(r.content || r.category || '') + '</div></div>'
       + (r.tel ? '<div class="kv"><b>연락처</b><div>' + E(r.tel) + '</div></div>' : '')
       + '<div class="kv"><b>접수</b><div>' + E(r.date || '') + ' ' + E(r.time || '') + ' · ' + E(r.team || '') + (r.no ? ' · ' + E(r.no) : '') + '</div></div>'
@@ -3298,7 +3309,7 @@ async function checkGate(){
   const dist = (a, b) => { if (!a || !b) return Infinity; const R = 6371e3, t = Math.PI / 180, dl = (b.lat - a.lat) * t, dn = (b.lng - a.lng) * t;
     const h = Math.sin(dl / 2) ** 2 + Math.cos(a.lat * t) * Math.cos(b.lat * t) * Math.sin(dn / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(h)); };
   const fmtD = m => m === Infinity ? '' : m < 1000 ? Math.round(m / 10) * 10 + 'm' : (m / 1000).toFixed(1) + 'km';
-  const label = (k, x) => k === 'hazard' ? (x.riskType || x.hKind || '위험') + (x.addr ? ' · ' + x.addr : '') : (x.name || x.addr || '');
+  const label = (k, x) => k === 'hazard' ? (x.riskType || x.hKind || '위험') + (x.addr ? ' · ' + bnAddr(x.addr, x.dong) : '') : (x.name || x.addr || '');
   function draw(){
     const list = (D && D[cur]) || [], col = K[cur][1];
     const rows = list.map(x => ({ x, p: posOf(x), d: dist(me, posOf(x)) })).sort((a, b) => a.d - b.d || String(a.x.name || a.x.addr || '').localeCompare(String(b.x.name || b.x.addr || '')));
@@ -3318,7 +3329,7 @@ async function checkGate(){
   // [11_13] 종합예방관리대장처럼 — 지도 자료 50곳 이상이면 멀리(레벨 4↑)는 원+숫자로 뭉치고, 가까이는 핀. 50곳 미만이면 늘 핀
   let lgxRows = [], _pinT = 0;
   // [11_13d] 재해예방 핀 = 주소 (동 + 번지)
-  const shortAddr = x => String(x.addr || x.riskType || '위험').replace(/서울(특별시)?\s*|송파구\s*/g, '').replace(/번지/g, '').replace(/(동|가)(\d)/, '$1 $2').replace(/\s+/g, ' ').trim().slice(0, 14);
+  const shortAddr = x => bnAddr(x.addr, x.dong).slice(0, 16) || x.riskType || '위험';   // [11_13h] 대장과 같은 주소 표기
   const pinCol = x => (cur !== 'hazard' && !isUse(x)) ? '#9ca3af' : K[cur][1];
   function cluDonut(cols, total){
     const size = total >= 50 ? 64 : total >= 10 ? 56 : 48, dpr = window.devicePixelRatio || 1, cv = document.createElement('canvas');
@@ -3372,8 +3383,8 @@ async function checkGate(){
     const c = document.getElementById('lgx-card'), st = k === 'hazard' ? (x.hKind || '사고재해예방') : (isUse(x) ? (x._t === 'rfid' ? '사용' : '계약 중') : (x._t === 'rfid' ? '미사용' : '해지'));
     const fl = (FIELDS[k] || []).map(([f, l]) => '<label class="lgx-f">' + l + '<input data-f="' + f + '" value="' + E(x[f] || '') + '"></label>').join('');
     const hist = Object.values(x.hist || {}).sort((a, b) => String(b.at).localeCompare(String(a.at))).slice(0, 8);
-    c.innerHTML = '<h4>' + E(K[k][0]) + ' · ' + E(k === 'hazard' ? (x.addr || '') : (x.name || '')) + ' <span style="font-size:12px;color:#0f7a86">' + E(st) + '</span></h4>'
-      + '<div style="font-size:13px;color:#6b7280">' + E(x.addr || '') + (x.lastInsp ? ' · 최근 점검 ' + E(x.lastInsp.at) + ' ' + E(x.lastInsp.by || '') : '') + '</div>'
+    c.innerHTML = '<h4>' + E(K[k][0]) + ' · ' + E(k === 'hazard' ? bnAddr(x.addr, x.dong) : (x.name || '')) + ' <span style="font-size:12px;color:#0f7a86">' + E(st) + '</span></h4>'
+      + '<div style="font-size:13px;color:#6b7280">' + E(bnAddr(x.addr, x.dong)) + (x.lastInsp ? ' · 최근 점검 ' + E(x.lastInsp.at) + ' ' + E(x.lastInsp.by || '') : '') + '</div>'
       + (k === 'hazard' ? hzInfo(x) : '')
       + '<div class="lgx-ph" id="lgx-ph"><label>📷<br>사진 찍기<input type="file" accept="image/*" capture="environment" multiple style="display:none" id="lgx-phin"></label></div>'
       + (fl ? '<div class="lgx-two">' + fl + '</div>' : '')
@@ -3425,7 +3436,7 @@ async function checkGate(){
   function evForm(k, x, t){
     const c = document.getElementById('lgx-card'), isSwap = /교체/.test(t), d = new Date(), p = n => String(n).padStart(2, '0');
     const ymd = d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
-    c.innerHTML = '<h4>' + E(t) + ' · ' + E(k === 'hazard' ? (x.addr || '') : (x.name || '')) + '</h4>'
+    c.innerHTML = '<h4>' + E(t) + ' · ' + E(k === 'hazard' ? bnAddr(x.addr, x.dong) : (x.name || '')) + '</h4>'
       + '<label class="lgx-f">날짜<input type="date" id="ev-d" value="' + ymd + '"></label>'
       + (isSwap ? '<div class="lgx-two"><label class="lgx-f">전 모델<input id="ev-from" value="' + E(x.model || '') + '"></label><label class="lgx-f">새 모델<input id="ev-to"></label></div>' : '')
       + '<label class="lgx-f">사유<input id="ev-why" placeholder="예: 투입구 고장"></label>'
