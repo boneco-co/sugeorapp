@@ -401,7 +401,7 @@ button{font-family:inherit;cursor:pointer;border:0}
   <!-- [11_13] [📋민원] — 민원처리앱으로 넘어가지 않고 수거앱 안 민원 화면 (자료: 종합예방관리대장 = 부장님 저장소 report/recs) -->
   <button type="button" class="hbtn" id="mw-btn" onclick="mwxOpen()" style="border-color:#0f7a86;color:#0f7a86">📋<span class="mw-t">민원</span></button>
   <button class="hbtn ic" id="worker" onclick="openWorker()">👤</button>
-  <span id="app-ver">v1113d</span>
+  <span id="app-ver">v1113e</span>
 </div>
 <div id="offbar"></div>
 <div id="viewbar" style="display:none;background:#fef3c7;color:#b45309;font-weight:800;font-size:14px;padding:8px 12px;justify-content:space-between;align-items:center;gap:8px">
@@ -1059,9 +1059,9 @@ function statusOf(r){
   return 'g';
 }
 
-function zoneOf(r){
-  // [8_28] _견적 플래그 또는 비고에 '견적' 표기
-  if (r._견적 || /견적/.test(String(r.비고||''))) return '견적';
+function zoneOf(r, noQuote){
+  // [8_28] _견적 플래그 또는 비고에 '견적' 표기  ([11_13e] noQuote=true 면 견적이어도 실제 동 구역)
+  if (!noQuote && (r._견적 || /견적/.test(String(r.비고||'')))) return '견적';
   const d = String(r._dong||'').trim();
   // [10_16] 특수마대 판단은 원장(isSpecialMaedae)과 똑같이 — 특수마대 표시·동 구분·품목만 본다.
   //   비고·메모는 보지 않는다(비고에 '특수마대로 배출' 같은 메모만 있는 일반 건이 앱에서 사라지던 문제).
@@ -1179,9 +1179,11 @@ function visible(r){
   return inZone(r) && inDate(r);
 }
 
+// [11_13e] 견적 건도 실제 동(구역)으로 담당구역에 들어간다 — 기본 목록에 자기 구역 견적이 같이 보임 ([견적] 버튼은 견적만 모아 보기)
+function zoneOfArea(r){ const z = zoneOf(r); return z === '견적' ? zoneOf(r, true) : z; }
 function inZone(r){
   if (!ZONES.length) return true;
-  return ZONES.includes(zoneOf(r));
+  return ZONES.includes(zoneOfArea(r));
 }
 // [8_28] 구역 버튼(#zone) 라벨은 담당구역만 표시한다.
 //   예전엔 견적/특수마대 ON 일 때 여기에도 '견적'이 떠서 상단에 견적 버튼이
@@ -2570,7 +2572,7 @@ function setDate(v){
   closeModal(); render(); fitZone();
 }
 
-function countIn(zone){ return ROWS.filter(r=>zoneOf(r)===zone && inDate(r)).length; }
+function countIn(zone){ return ROWS.filter(r=>zoneOfArea(r)===zone && inDate(r)).length; }
 
 // [10_1] showCnt=false → 숫자 없이 구역 이름만 (첫 접속 수거원 화면에서 사용)
 function zoneChips(sel, showCnt = true){
