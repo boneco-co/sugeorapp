@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f7a86">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="본에코 민원">
+<title>본에코 민원</title>
+<link rel="manifest" href="minwon.json">
+<link rel="icon" href="favicon.ico">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<style>
+/* [11_13] 야간팀·기동반 민원 전용 앱 — 대형 수거 화면 없이 민원만. 자료는 종합예방관리대장(부장님 저장소 report/recs) */
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;font-family:'Noto Sans KR',-apple-system,sans-serif;background:#fff;color:#1f2937}
+button{font-family:inherit;cursor:pointer}
+#mwx-pane{position:fixed;inset:0;background:#fff;z-index:2950;display:none;flex-direction:column}
+#mwx-pane.on{display:flex}
+#mwx-top{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid #e5e7eb;padding-top:calc(10px + env(safe-area-inset-top,0px))}
+#mwx-top button{border:1.5px solid #0f7a86;color:#0f7a86;background:#fff;border-radius:999px;padding:5px 11px;font-size:13px;font-weight:800}
+#mwx-top b{flex:1;font-size:16px}
+.mwx-chips{display:flex;gap:6px;overflow-x:auto;padding:8px 10px 4px}
+.mwx-chips button{flex:none;white-space:nowrap;border:1.5px solid #d9e1e8;border-radius:999px;padding:6px 11px;font-size:13px;font-weight:800;background:#fff;color:#374151}
+.mwx-chips button.on{background:#0f7a86;border-color:#0f7a86;color:#fff}
+.mwx-seg{display:grid;grid-template-columns:repeat(3,1fr);margin:4px 10px 8px;border:1.5px solid #d9e1e8;border-radius:10px;overflow:hidden}
+.mwx-seg button{border:0;background:#fff;font-size:13.5px;font-weight:800;padding:7px 0;color:#4b5563}.mwx-seg button.on{background:#dff2f5;color:#0f7a86}
+#mwx-map{flex:1;min-height:180px}
+#mwx-list{max-height:40vh;overflow:auto;border-top:1px solid #e5e7eb;padding:8px 10px calc(8px + env(safe-area-inset-bottom,0px));display:grid;gap:8px;align-content:start}
+.mwx-it{border:1px solid #e5e7eb;border-left:5px solid #64748b;border-radius:12px;padding:9px 11px;display:grid;gap:3px;cursor:pointer}
+.mwx-it .r1{display:flex;justify-content:space-between;align-items:center;gap:8px}.mwx-it .r1 b{font-size:15.5px}
+.mwx-st{font-size:12px;font-weight:900;border-radius:999px;padding:2px 9px;white-space:nowrap}.mwx-st.w{background:#fef3c7;color:#b45309}.mwx-st.d{background:#dcfce7;color:#15803d}
+.mwx-it .tx{font-size:14px;color:#1f2937}.mwx-it .mt{font-size:12.5px;color:#6b7280;display:flex;justify-content:space-between;gap:8px}
+.mwx-tag{font-size:11.5px;font-weight:900;border-radius:999px;padding:1px 7px;color:#fff;margin-right:4px}
+.mwx-pin{transform:translate(-50%,-100%);background:#fff;border:2.5px solid;border-radius:9px;padding:3px 9px;font-size:13.5px;font-weight:800;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.25);cursor:pointer}
+#mwx-card{position:fixed;left:0;right:0;bottom:0;z-index:3150;background:#fff;border-radius:18px 18px 0 0;box-shadow:0 -6px 24px rgba(0,0,0,.18);padding:14px 16px calc(14px + env(safe-area-inset-bottom,0px));display:none;max-height:86vh;overflow:auto}
+#mwx-card.on{display:block}
+#mwx-card .kv{display:grid;grid-template-columns:62px 1fr;gap:8px;font-size:14px;border-bottom:1px solid #f1f5f9;padding:5px 0}#mwx-card .kv b{color:#6b7280;font-size:13px}
+.mwx-phs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
+.mwx-pb{border:1.5px dashed #93c5fd;background:#eff6ff;border-radius:12px;aspect-ratio:4/3;display:grid;place-items:center;font-size:13px;font-weight:800;color:#475569;overflow:hidden;cursor:pointer;position:relative}
+.mwx-pb img{width:100%;height:100%;object-fit:cover}
+.mwx-pb span{position:absolute;left:6px;top:6px;background:rgba(15,23,42,.65);color:#fff;font-size:11.5px;border-radius:999px;padding:1px 8px}
+#mwx-memo{width:100%;box-sizing:border-box;border:1.5px solid #d9e1e8;border-radius:10px;padding:10px 12px;font-size:15px}
+#mwx-done{width:100%;border:0;border-radius:12px;background:#15803d;color:#fff;font-size:17px;font-weight:900;padding:13px;margin-top:10px}
+#mwx-done:disabled{opacity:.6}
+
+#mwx-top button.hide{display:none}
+#toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:rgba(15,23,42,.92);color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;font-weight:700;z-index:4000;display:none;max-width:90vw;text-align:center}
+#who-ov{position:fixed;inset:0;z-index:5000;background:#eaf2fb;display:none;align-items:center;justify-content:center;padding:20px}
+#who-ov.on{display:flex}
+#who-box{background:#fff;border-radius:18px;padding:22px;width:min(360px,100%);box-shadow:0 10px 30px rgba(0,0,0,.12);display:grid;gap:12px}
+#who-box h2{margin:0;font-size:20px}#who-box p{margin:0;color:#4b5563;font-size:14px}
+#who-in{border:1.5px solid #d9e1e8;border-radius:12px;padding:12px;font-size:17px}
+#who-go{border:0;border-radius:12px;background:#0f7a86;color:#fff;font-size:17px;font-weight:900;padding:13px}
+#who-chg{border:0;background:none;color:#0f7a86;font-size:12.5px;font-weight:800;padding:0 4px}
+</style>
+</head>
+<body>
+<div id="toast"></div>
+<div id="who-ov"><div id="who-box"><h2>📋 본에코 민원</h2><p>처리한 사람으로 남길 이름을 넣어 주세요. 한 번만 넣으면 됩니다.</p><input id="who-in" placeholder="이름" autocomplete="off"><button type="button" id="who-go">시작</button></div></div>
+<div id="mwx-pane">
+  <div id="mwx-top"><button type="button" onclick="mwxClose()">🚛 수거로</button><b id="mwx-ttl">📋 민원</b></div>
+  <div class="mwx-chips" id="mwx-team"></div>
+  <div class="mwx-seg" id="mwx-seg"><button type="button" class="on" data-f="open">미처리</button><button type="button" data-f="today">오늘 처리</button><button type="button" data-f="all">전체</button></div>
+  <div id="mwx-map"></div>
+  <div id="mwx-list"></div>
+</div>
+<div id="mwx-card"></div>
+<input type="file" id="mwx-file" accept="image/*" capture="environment" style="display:none">
+<script>
+const KAKAO_JS_KEY = 'b8908c96799936ef733a0445f1bd6abc';
+function loadKakaoMap(){ return new Promise((ok, fail) => { const s = document.createElement('script'); s.src = 'https://dapi.kakao.com/v2/maps/sdk.js?appkey=' + KAKAO_JS_KEY + '&autoload=false'; s.onload = () => kakao.maps.load(ok); s.onerror = () => fail('load'); document.head.appendChild(s); }); }
+let _tT = null; function toast(m){ const t = document.getElementById('toast'); t.textContent = m; t.style.display = 'block'; clearTimeout(_tT); _tT = setTimeout(() => t.style.display = 'none', 2600); }
+// 새 미처리 민원이 늘면 소리·진동 (폰은 화면을 한 번 만진 뒤부터 소리)
+let _ac = null, _lastN = -1; ['pointerdown','touchstart'].forEach(ev => document.addEventListener(ev, () => { try { if (!_ac) _ac = new (window.AudioContext || window.webkitAudioContext)(); if (_ac.state === 'suspended') _ac.resume(); } catch(e){} }, { passive:true }));
+function _beep(){ try { if (_ac && _ac.state === 'running' && !document.hidden) [0,.25,.5].forEach(o => { const g = _ac.createGain(), os = _ac.createOscillator(); os.frequency.value = 1100; os.connect(g); g.connect(_ac.destination); g.gain.setValueAtTime(.25, _ac.currentTime + o); os.start(_ac.currentTime + o); os.stop(_ac.currentTime + o + .15); }); } catch(e){} try { if (navigator.vibrate && !document.hidden) navigator.vibrate([200,100,200,100,200]); } catch(e){} }
+function _mwFeed(v){ const n = Object.keys(v || {}).length; if (_lastN >= 0 && n > _lastN) { _beep(); toast('🔔 새 민원이 들어왔습니다'); } _lastN = n; document.title = (n ? '(' + n + ') ' : '') + '본에코 민원'; }
+</script>
+<script>
+// ══ [11_13] 현장 민원 — 종합예방관리대장(부장님 저장소 minwon-c29c2 report/recs)의 민원을 실시간으로 받아 사진·메모·처리완료 ══
+(function(){
+  const BOSS = { apiKey:'AIzaSyCrJaARREMDXFfhicjUwWFyqkyTbVMRsYk', authDomain:'minwon-c29c2.firebaseapp.com', databaseURL:'https://minwon-c29c2-default-rtdb.asia-southeast1.firebasedatabase.app', projectId:'minwon-c29c2' };
+  const TEAMS = ['전체','기동반','야간 생활팀','야간 음식물팀','야간 재활용팀'];
+  const COL = { 생활:'#16a34a', 음식물:'#facc15', 재활용:'#2563eb', 공용용기:'#a16207', 특수마대:'#db2777', 기타:'#64748b' };
+  const E = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const lsG = (k, d) => { try { return localStorage.getItem(k) || d; } catch(e){ return d; } }, lsS = (k, v) => { try { localStorage.setItem(k, v); } catch(e){} };
+  const ymd = d => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  const nowS = () => { const d = new Date(); return ymd(d) + ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0'); };
+  const who = () => { try { return (localStorage.getItem('worker') || '').trim() || '현장'; } catch(e){ return '현장'; } };
+  const col = r => COL[r.subtype] || COL.기타, done = r => r.status === '처리완료';
+  const posOf = r => r.pos && r.pos.lat ? r.pos : (r.addrPos && r.addrPos.lat ? r.addrPos : null);
+  let app = null, REF = null, RECS = {}, team = lsG('mwx_team', '전체'), flt = 'open', map = null, pins = [], rows = [], sel = null, ph = {}, phWhich = '';
+  function db(){ if (!app) app = firebase.apps.find(a => a.name === 'boss') || firebase.initializeApp(BOSS, 'boss'); return app; }
+  // 실시간 구독 — 버튼 알림(숫자·깜빡임)도 이 자료로
+  async function sub(){
+    if (REF) return; const a = db();
+    try { if (!a.auth().currentUser) await a.auth().signInAnonymously(); } catch(e){}
+    REF = a.database().ref('report/recs');
+    REF.orderByChild('recType').equalTo('minwon').on('value', sn => {
+      const v = sn.val() || {}; RECS = {}; Object.keys(v).forEach(k => { const r = v[k]; if (r && !r.del) RECS[k] = Object.assign({ id:k }, r); });
+      const un = {}; Object.values(RECS).forEach(r => { if (!done(r)) { const t = Date.parse(String(r.date||'') + 'T' + (r.time || '00:00')); un[r.id] = { recvAt: isNaN(t) ? 0 : t, workDate: r.date || '' }; } });
+      if (typeof _mwFeed === 'function') _mwFeed(un);
+      if (document.getElementById('mwx-pane').classList.contains('on')) render();
+      if (sel && RECS[sel.id]) { sel = RECS[sel.id]; }
+    }, e => { if (typeof toast === 'function') toast('⚠️ 민원 자료를 못 읽었습니다'); REF = null; });
+  }
+  window.mwxOpen = async function(){
+    document.getElementById('mwx-pane').classList.add('on'); bindFile();
+    renderTeam(); await sub(); render();
+    if (!map){
+      if (!(window.kakao && kakao.maps && kakao.maps.Map) && typeof loadKakaoMap === 'function'){ try { await loadKakaoMap(); } catch(e){} }
+      if (window.kakao && kakao.maps && kakao.maps.Map){ map = new kakao.maps.Map(document.getElementById('mwx-map'), { center: new kakao.maps.LatLng(37.5068, 127.0885), level: 5 }); kakao.maps.event.addListener(map, 'idle', drawPins); }
+    } else setTimeout(() => map.relayout(), 30);
+    render(true);
+  };
+  window.mwxClose = () => { document.getElementById('mwx-pane').classList.remove('on'); document.getElementById('mwx-card').classList.remove('on'); };
+  function renderTeam(){
+    const b = document.getElementById('mwx-team');
+    b.innerHTML = TEAMS.map(t => '<button type="button" data-t="' + t + '"' + (t === team ? ' class="on"' : '') + '>' + t.replace('야간 ', '야간 ').replace('팀','') + '</button>').join('');
+    b.querySelectorAll('button').forEach(x => x.onclick = () => { team = x.dataset.t; lsS('mwx_team', team); renderTeam(); render(true); });
+  }
+  document.addEventListener('click', e => { const f = e.target.closest && e.target.closest('#mwx-seg button'); if (!f) return; flt = f.dataset.f; document.querySelectorAll('#mwx-seg button').forEach(x => x.classList.toggle('on', x === f)); render(true); });
+  function render(fit){
+    const t = ymd(new Date());
+    let all = Object.values(RECS).filter(r => team === '전체' || (r.team || '') === team);
+    const openN = all.filter(r => !done(r)).length, todayN = all.filter(r => done(r) && String(r.doneAt || r.updatedAt || '').slice(0,10) === t).length;
+    document.querySelector('#mwx-seg [data-f="open"]').textContent = '미처리 ' + openN; document.querySelector('#mwx-seg [data-f="today"]').textContent = '오늘 처리 ' + todayN;
+    document.getElementById('mwx-ttl').textContent = '📋 민원 · ' + (team === '전체' ? '전체 팀' : team);
+    rows = all.filter(r => flt === 'open' ? !done(r) : flt === 'today' ? (done(r) && String(r.doneAt || r.updatedAt || '').slice(0,10) === t) : true)
+      .sort((a, b) => String((b.date||'') + (b.time||'')).localeCompare(String((a.date||'') + (a.time||''))));
+    const L = document.getElementById('mwx-list');
+    L.innerHTML = rows.slice(0, 300).map((r, i) => '<div class="mwx-it" data-i="' + i + '" style="border-left-color:' + col(r) + '"><div class="r1"><b>' + E(r.addr || '주소 없음') + '</b><span class="mwx-st ' + (done(r) ? 'd">처리완료' : 'w">미처리') + '</span></div>'
+      + '<div class="tx"><span class="mwx-tag" style="background:' + col(r) + ';color:' + (col(r) === '#facc15' ? '#422006' : '#fff') + '">' + E(r.subtype || '민원') + '</span>' + E(String(r.content || r.category || '').slice(0, 80)) + '</div>'
+      + '<div class="mt"><span>' + E(String(r.date || '').slice(5)) + ' ' + E(r.time || '') + ' 접수</span><span>' + E(r.team || '') + '</span></div></div>').join('')
+      || '<div style="padding:14px;color:#6b7280;font-size:14px">' + (flt === 'open' ? '미처리 민원이 없습니다 ✅' : '해당하는 민원이 없습니다') + '</div>';
+    L.querySelectorAll('.mwx-it').forEach(el => el.onclick = () => { const r = rows[+el.dataset.i]; card(r); const p = posOf(r); if (map && p) map.panTo(new kakao.maps.LatLng(p.lat, p.lng)); });
+    if (map){ if (fit){ const pts = rows.filter(posOf); if (pts.length){ const bd = new kakao.maps.LatLngBounds(); pts.forEach(r => { const p = posOf(r); bd.extend(new kakao.maps.LatLng(p.lat, p.lng)); }); if (pts.length === 1){ const p = posOf(pts[0]); map.setCenter(new kakao.maps.LatLng(p.lat, p.lng)); map.setLevel(3); } else map.setBounds(bd); } } drawPins(); }
+  }
+  function donut(cols, total){
+    const size = total >= 50 ? 64 : total >= 10 ? 56 : 48, dpr = window.devicePixelRatio || 1, cv = document.createElement('canvas');
+    cv.width = size * dpr; cv.height = size * dpr; cv.style.width = size + 'px'; cv.style.height = size + 'px';
+    const g = cv.getContext('2d'); g.scale(dpr, dpr); const c = size / 2, R = c - 2, ring = Math.max(6, size * .17);
+    g.beginPath(); g.arc(c, c, R, 0, Math.PI * 2); g.fillStyle = 'rgba(15,23,42,.30)'; g.fill();
+    let a = -Math.PI / 2; Object.keys(cols).forEach(k => { const sw = cols[k] / total * Math.PI * 2; g.beginPath(); g.arc(c, c, R - ring / 2, a, a + sw); g.strokeStyle = k; g.lineWidth = ring; g.stroke(); a += sw; });
+    g.beginPath(); g.arc(c, c, R - ring, 0, Math.PI * 2); g.fillStyle = '#fff'; g.fill();
+    g.fillStyle = '#0f172a'; g.font = '800 ' + (total >= 100 ? 15 : total >= 10 ? 17 : 19) + 'px -apple-system,sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(String(total), c, c + .5);
+    return cv;
+  }
+  // 50곳 이상이면 멀리서 원+숫자로 뭉치고, 가까이는 주소 핀 (종합예방관리대장과 같은 규칙)
+  function drawPins(){
+    if (!map) return; pins.forEach(o => o.setMap(null)); pins = [];
+    const pts = rows.filter(posOf); if (!pts.length) return;
+    const pin = r => { const p = posOf(r), el = document.createElement('div'); el.className = 'mwx-pin'; el.style.borderColor = col(r); el.style.color = col(r) === '#facc15' ? '#854d0e' : col(r);
+      el.textContent = String(r.addr || '').replace(/서울(특별시)?\s*|송파구\s*/g, '').slice(0, 14) || '민원'; el.onclick = () => card(r);
+      pins.push(new kakao.maps.CustomOverlay({ map, position: new kakao.maps.LatLng(p.lat, p.lng), content: el, yAnchor: 1 })); };
+    const b = map.getBounds(), sw = b.getSouthWest(), ne = b.getNorthEast(), el = document.getElementById('mwx-map'), lv = map.getLevel();
+    const inView = pts.filter(r => { const p = posOf(r); return p.lat >= sw.getLat() && p.lat <= ne.getLat() && p.lng >= sw.getLng() && p.lng <= ne.getLng(); }).length;
+    if (pts.length < 50 || lv <= 2 || (lv === 3 && inView <= 40)) { pts.forEach(pin); return; }
+    const dLat = (ne.getLat() - sw.getLat()) / (el.clientHeight || 600), dLng = (ne.getLng() - sw.getLng()) / (el.clientWidth || 600);
+    if (!(dLat > 0 && dLng > 0)) { pts.forEach(pin); return; }
+    const bins = {}; pts.forEach(r => { const p = posOf(r), k = Math.floor(p.lat / (dLat * 95)) + '_' + Math.floor(p.lng / (dLng * 95)); (bins[k] = bins[k] || []).push(r); });
+    const cen = g => { const n = g.rows.length; g.lat = g.rows.reduce((s, r) => s + (+posOf(r).lat), 0) / n; g.lng = g.rows.reduce((s, r) => s + (+posOf(r).lng), 0) / n; return g; };
+    const merged = []; Object.values(bins).map(r => cen({ rows: r })).sort((a, b) => b.rows.length - a.rows.length).forEach(g => {
+      const near = merged.find(m => Math.hypot((m.lat - g.lat) / dLat, (m.lng - g.lng) / dLng) < 78); if (near) { near.rows = near.rows.concat(g.rows); cen(near); } else merged.push(g); });
+    merged.forEach(g => {
+      if (g.rows.length === 1) { pin(g.rows[0]); return; }
+      const cols = {}; g.rows.forEach(r => { cols[col(r)] = (cols[col(r)] || 0) + 1; });
+      const box = document.createElement('div'); box.style.cssText = 'cursor:pointer;filter:drop-shadow(0 2px 4px rgba(0,0,0,.25))'; box.appendChild(donut(cols, g.rows.length));
+      box.onclick = () => map.setLevel(Math.max(2, map.getLevel() - 2), { anchor: new kakao.maps.LatLng(g.lat, g.lng) });
+      pins.push(new kakao.maps.CustomOverlay({ map, position: new kakao.maps.LatLng(g.lat, g.lng), content: box, xAnchor: .5, yAnchor: .5, zIndex: 4 }));
+    });
+  }
+  // 한 건 — 처리 전·후 사진, 한 줄 메모, [✅ 처리완료] → 종합예방관리대장에 바로 보임
+  function card(r){
+    sel = r; ph = {};
+    const c = document.getElementById('mwx-card'), p = posOf(r);
+    c.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b style="font-size:17px">' + E(r.addr || '주소 없음') + '</b><button type="button" id="mwx-x" style="border:0;background:#f1f5f9;border-radius:50%;width:32px;height:32px;font-size:16px">✕</button></div>'
+      + '<div class="kv"><b>민원</b><div><span class="mwx-tag" style="background:' + col(r) + ';color:' + (col(r) === '#facc15' ? '#422006' : '#fff') + '">' + E(r.subtype || '민원') + '</span>' + E(r.content || r.category || '') + '</div></div>'
+      + (r.tel ? '<div class="kv"><b>연락처</b><div>' + E(r.tel) + '</div></div>' : '')
+      + '<div class="kv"><b>접수</b><div>' + E(r.date || '') + ' ' + E(r.time || '') + ' · ' + E(r.team || '') + (r.no ? ' · ' + E(r.no) : '') + '</div></div>'
+      + (p ? '<div class="kv"><b>위치</b><div><a href="https://map.kakao.com/link/to/' + encodeURIComponent(r.addr || '민원') + ',' + p.lat + ',' + p.lng + '" target="_blank" rel="noopener" style="color:#0f7a86;font-weight:800">🗺️ 길찾기</a></div></div>' : '')
+      + (r.fieldMemo ? '<div class="kv"><b>메모</b><div style="white-space:pre-line">' + E(r.fieldMemo) + '</div></div>' : '')
+      + '<div class="mwx-phs"><div class="mwx-pb" data-w="before"><span>처리 전</span>📷 찍기</div><div class="mwx-pb" data-w="after"><span>처리 후</span>📷 찍기</div></div>'
+      + '<input id="mwx-memo" placeholder="한 줄 메모 (예: 수거 완료, 봉투 3개)" autocomplete="off">'
+      + '<button type="button" id="mwx-done">' + (done(r) ? '💾 사진·메모 저장 (처리완료 유지)' : '✅ 처리완료') + '</button>';
+    c.classList.add('on');
+    document.getElementById('mwx-x').onclick = () => c.classList.remove('on');
+    c.querySelectorAll('.mwx-pb').forEach(b => b.onclick = () => { phWhich = b.dataset.w; document.getElementById('mwx-file').click(); });
+    document.getElementById('mwx-done').onclick = save;
+    db().database().ref('report/photos/' + r.id).once('value').then(sn => { const v = sn.val() || {}; ['before','after'].forEach(w => { if (v[w] && sel && sel.id === r.id) showPh(w, v[w]); }); }).catch(() => {});
+  }
+  function showPh(w, src){ const b = document.querySelector('#mwx-card .mwx-pb[data-w="' + w + '"]'); if (b) b.innerHTML = '<span>' + (w === 'before' ? '처리 전' : '처리 후') + '</span><img alt="" src="' + src + '">'; }
+  function shrink(file){ return new Promise((ok, no) => { const u = URL.createObjectURL(file), im = new Image(); im.onload = () => { const m = 1280, r = Math.min(1, m / Math.max(im.width, im.height)), cv = document.createElement('canvas');
+    cv.width = Math.round(im.width * r); cv.height = Math.round(im.height * r); cv.getContext('2d').drawImage(im, 0, 0, cv.width, cv.height); URL.revokeObjectURL(u); ok(cv.toDataURL('image/jpeg', .6)); }; im.onerror = () => { URL.revokeObjectURL(u); no(new Error('사진을 못 읽었습니다')); }; im.src = u; }); }
+  function bindFile(){ const fi = document.getElementById('mwx-file'); if (!fi || fi._b) return; fi._b = 1; fi.addEventListener('change', async e => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (!f || !phWhich) return;
+    try { const d = await shrink(f); ph[phWhich] = d; showPh(phWhich, d); } catch(err){ if (typeof toast === 'function') toast('⚠️ ' + err.message); } }); }
+  async function save(){
+    const r = sel; if (!r) return; const btn = document.getElementById('mwx-done'); btn.disabled = true; btn.textContent = '저장 중…';
+    try {
+      const a = db(), memo = (document.getElementById('mwx-memo').value || '').trim(), t = nowS();
+      for (const w of Object.keys(ph)) await a.database().ref('report/photos/' + r.id + '/' + w).set(ph[w]);
+      const up = { status: '처리완료', updatedAt: t };
+      if (!done(r)) { up.doneAt = t; up.doneBy = who(); }
+      if (memo) up.fieldMemo = (r.fieldMemo ? r.fieldMemo + '\n' : '') + t.slice(5) + ' ' + who() + ': ' + memo;
+      await a.database().ref('report/recs/' + r.id).update(up);
+      if (typeof toast === 'function') toast('✅ 처리완료 — 종합예방관리대장에 바로 보입니다');
+      document.getElementById('mwx-card').classList.remove('on');
+    } catch(e){ if (typeof toast === 'function') toast('❌ 저장 실패: ' + e.message); btn.disabled = false; btn.textContent = '✅ 처리완료'; }
+  }
+  // 알림(숫자·깜빡임)은 화면을 안 열어도 받는다
+  setTimeout(() => { try { sub(); } catch(e){} }, 1500);
+})();
+</script>
+<script>
+// 시작: 이름 한 번 → 바로 민원 화면 (수거로 버튼 없음, 이름 바꾸기만)
+(function(){
+  const top = document.querySelector('#mwx-top button'); if (top) top.classList.add('hide');
+  const chg = document.createElement('button'); chg.id = 'who-chg'; chg.type = 'button'; document.getElementById('mwx-top').appendChild(chg);
+  const name = () => { try { return (localStorage.getItem('worker') || '').trim(); } catch(e){ return ''; } };
+  const showName = () => chg.textContent = '👤 ' + (name() || '이름');
+  const go = () => { const v = document.getElementById('who-in').value.trim(); if (!v) { toast('이름을 넣어 주세요'); return; } try { localStorage.setItem('worker', v); } catch(e){} document.getElementById('who-ov').classList.remove('on'); showName(); mwxOpen(); };
+  document.getElementById('who-go').onclick = go; document.getElementById('who-in').addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
+  chg.onclick = () => { document.getElementById('who-in').value = name(); document.getElementById('who-ov').classList.add('on'); };
+  showName();
+  if (!name()) document.getElementById('who-ov').classList.add('on'); else mwxOpen();
+})();
+</script>
+</body>
+</html>
