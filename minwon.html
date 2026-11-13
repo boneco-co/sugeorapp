@@ -49,18 +49,24 @@ button{font-family:inherit;cursor:pointer}
 
 #mwx-top button.hide{display:none}
 #toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:rgba(15,23,42,.92);color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;font-weight:700;z-index:4000;display:none;max-width:90vw;text-align:center}
-#who-ov{position:fixed;inset:0;z-index:5000;background:#eaf2fb;display:none;align-items:center;justify-content:center;padding:20px}
-#who-ov.on{display:flex}
-#who-box{background:#fff;border-radius:18px;padding:22px;width:min(360px,100%);box-shadow:0 10px 30px rgba(0,0,0,.12);display:grid;gap:12px}
-#who-box h2{margin:0;font-size:20px}#who-box p{margin:0;color:#4b5563;font-size:14px}
-#who-in{border:1.5px solid #d9e1e8;border-radius:12px;padding:12px;font-size:17px}
-#who-go{border:0;border-radius:12px;background:#0f7a86;color:#fff;font-size:17px;font-weight:900;padding:13px}
+.who-wrap{position:fixed;inset:0;z-index:5000;background:#eaf2fb;display:none;align-items:center;justify-content:center;padding:20px}
+.who-wrap.on{display:flex}
+.who-box{background:#fff;border-radius:18px;padding:22px;width:min(380px,100%);box-shadow:0 10px 30px rgba(0,0,0,.12);display:grid;gap:12px}
+.who-box h2{margin:0;font-size:20px;text-align:center}.who-box p{margin:0;color:#4b5563;font-size:14px;text-align:center}.err{color:#dc2626;font-size:13px;text-align:center;min-height:18px}
+.chips2{display:flex;gap:6px;flex-wrap:wrap}.chips2 button{border:1.5px solid #d9e1e8;border-radius:999px;padding:7px 12px;font-size:14px;font-weight:800;background:#fff;color:#374151}.chips2 button.on{background:#0f7a86;border-color:#0f7a86;color:#fff}
+#gate-in,#car-in{border:1.5px solid #d9e1e8;border-radius:12px;padding:12px;font-size:17px;text-align:center}
+.go{border:0;border-radius:12px;background:#0f7a86;color:#fff;font-size:17px;font-weight:900;padding:13px}
 #who-chg{border:0;background:none;color:#0f7a86;font-size:12.5px;font-weight:800;padding:0 4px}
 </style>
 </head>
 <body>
 <div id="toast"></div>
-<div id="who-ov"><div id="who-box"><h2>📋 본에코 민원</h2><p>처리한 사람으로 남길 이름을 넣어 주세요. 한 번만 넣으면 됩니다.</p><input id="who-in" placeholder="이름" autocomplete="off"><button type="button" id="who-go">시작</button></div></div>
+<div id="gate-ov" class="who-wrap"><div class="who-box"><h2>🔒 직원 비밀번호</h2><p>직원만 입력할 수 있습니다 (하루 한 번)</p><input id="gate-in" type="password" placeholder="직원 비밀번호 입력" autocomplete="current-password"><div id="gate-err" class="err"></div><button type="button" id="gate-go" class="go">확인</button></div></div>
+<div id="car-ov" class="who-wrap"><div class="who-box"><h2>🚛 차량 선택</h2><p>팀과 차량번호 뒤 4자리를 고르세요. 처리한 차량으로 남습니다.</p>
+  <div id="car-recent" class="chips2"></div>
+  <div class="chips2" id="car-team"></div>
+  <input id="car-in" inputmode="numeric" maxlength="4" placeholder="차량번호 뒤 4자리" autocomplete="off">
+  <div id="car-err" class="err"></div><button type="button" id="car-go" class="go">시작</button></div></div>
 <div id="mwx-pane">
   <div id="mwx-top"><button type="button" onclick="mwxClose()">🚛 수거로</button><b id="mwx-ttl">📋 민원</b></div>
   <div class="mwx-chips" id="mwx-team"></div>
@@ -215,17 +221,54 @@ function _mwFeed(v){ const n = Object.keys(v || {}).length; if (_lastN >= 0 && n
 })();
 </script>
 <script>
-// 시작: 이름 한 번 → 바로 민원 화면 (수거로 버튼 없음, 이름 바꾸기만)
+// [11_13] 시작: 대형수거앱처럼 직원 비밀번호(하루 한 번) → 팀 + 차량번호 뒤 4자리 → 민원 화면
 (function(){
+  const WJ = { apiKey:"AIzaSyD4hPKN8cdtnsVACdvBxDfoR33mAOYEuco", authDomain:"boneco-wonjang.firebaseapp.com", databaseURL:"https://boneco-wonjang-default-rtdb.asia-southeast1.firebasedatabase.app", projectId:"boneco-wonjang", appId:"1:463413861191:web:c6a68b67fe000baae64a62" };
+  if (!firebase.apps.find(a => a.name === '[DEFAULT]')) firebase.initializeApp(WJ);
+  const STAFF_EMAIL = 'staff@boneco.kr', GATE = 'mw_gate_passDate', TEAMS = ['기동반','야간 생활팀','야간 음식물팀','야간 재활용팀'];
+  const $ = id => document.getElementById(id), ymd = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); };
+  const lsG = (k, d) => { try { return localStorage.getItem(k) || d; } catch(e){ return d; } }, lsS = (k, v) => { try { localStorage.setItem(k, v); } catch(e){} };
   const top = document.querySelector('#mwx-top button'); if (top) top.classList.add('hide');
-  const chg = document.createElement('button'); chg.id = 'who-chg'; chg.type = 'button'; document.getElementById('mwx-top').appendChild(chg);
-  const name = () => { try { return (localStorage.getItem('worker') || '').trim(); } catch(e){ return ''; } };
-  const showName = () => chg.textContent = '👤 ' + (name() || '이름');
-  const go = () => { const v = document.getElementById('who-in').value.trim(); if (!v) { toast('이름을 넣어 주세요'); return; } try { localStorage.setItem('worker', v); } catch(e){} document.getElementById('who-ov').classList.remove('on'); showName(); mwxOpen(); };
-  document.getElementById('who-go').onclick = go; document.getElementById('who-in').addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
-  chg.onclick = () => { document.getElementById('who-in').value = name(); document.getElementById('who-ov').classList.add('on'); };
-  showName();
-  if (!name()) document.getElementById('who-ov').classList.add('on'); else mwxOpen();
+  const chg = document.createElement('button'); chg.id = 'who-chg'; chg.type = 'button'; $('mwx-top').appendChild(chg);
+  const car = () => lsG('worker', '').trim();
+  const showCar = () => chg.textContent = '🚛 ' + (car() || '차량 선택');
+  const errMsg = e => { const c = (e && e.code) || ''; return /wrong-password|invalid-credential|invalid-login|invalid-password/.test(c) ? '비밀번호가 올바르지 않습니다' : /too-many-requests/.test(c) ? '여러 번 틀려 잠시 막혔습니다. 몇 분 뒤 다시 해 주세요' : /network/.test(c) ? '인터넷 연결을 확인해 주세요' : '로그인하지 못했습니다 (' + (c || '알 수 없음') + ')'; };
+  let selTeam = lsG('mwx_team', '');
+  function openCar(){
+    let recent = []; try { recent = JSON.parse(lsG('mw_cars', '[]')) || []; } catch(e){}
+    $('car-recent').innerHTML = recent.length ? recent.slice(0, 6).map(c => '<button type="button" data-t="' + c.t + '" data-d="' + c.d + '">' + c.t.replace('야간 ', '') + ' ' + c.d + '</button>').join('') : '';
+    $('car-recent').querySelectorAll('button').forEach(b => b.onclick = () => { selTeam = b.dataset.t; $('car-in').value = b.dataset.d; paintTeam(); });
+    if (!TEAMS.includes(selTeam)) selTeam = '';
+    const m = car().match(/(\d{4})$/); if (m && !$('car-in').value) $('car-in').value = m[1];
+    paintTeam(); $('car-err').textContent = ''; $('car-ov').classList.add('on');
+  }
+  function paintTeam(){ $('car-team').innerHTML = TEAMS.map(t => '<button type="button" data-t="' + t + '"' + (t === selTeam ? ' class="on"' : '') + '>' + t + '</button>').join(''); $('car-team').querySelectorAll('button').forEach(b => b.onclick = () => { selTeam = b.dataset.t; $('car-err').textContent = ''; paintTeam(); }); }
+  function saveCar(){
+    const d = ($('car-in').value || '').replace(/\D/g, '');
+    if (!selTeam) { $('car-err').textContent = '팀을 골라 주세요'; return; }
+    if (d.length !== 4) { $('car-err').textContent = '차량번호 뒤 4자리를 입력해 주세요'; return; }
+    const label = selTeam + ' ' + d; lsS('worker', label); lsS('mwx_team', selTeam);
+    let recent = []; try { recent = JSON.parse(lsG('mw_cars', '[]')) || []; } catch(e){}
+    recent = [{ t: selTeam, d }].concat(recent.filter(c => !(c.t === selTeam && c.d === d))).slice(0, 6); lsS('mw_cars', JSON.stringify(recent));
+    $('car-ov').classList.remove('on'); showCar(); location.reload();   // 고른 팀으로 화면을 새로 연다
+  }
+  async function checkGate(){
+    const v = ($('gate-in').value || '').trim(), err = $('gate-err');
+    if (!v) { err.textContent = '비밀번호를 입력해 주세요'; return; }
+    err.textContent = '확인 중…';
+    try { await firebase.auth().signInWithEmailAndPassword(STAFF_EMAIL, v); lsS(GATE, ymd()); err.textContent = ''; $('gate-ov').classList.remove('on'); if (car()) start(); else openCar(); }
+    catch(e){ err.textContent = errMsg(e); $('gate-in').value = ''; }
+  }
+  function start(){ showCar(); mwxOpen(); }
+  $('gate-go').onclick = checkGate; $('gate-in').addEventListener('keydown', e => { if (e.key === 'Enter') checkGate(); });
+  $('car-go').onclick = saveCar; $('car-in').addEventListener('keydown', e => { if (e.key === 'Enter') saveCar(); });
+  chg.onclick = openCar;
+  showCar();
+  const off = firebase.auth().onAuthStateChanged(function(u){ off();
+    const staff = !!(u && !u.isAnonymous && u.email === STAFF_EMAIL);
+    if (lsG(GATE, '') === ymd() && staff) { if (car()) start(); else openCar(); }
+    else { $('gate-ov').classList.add('on'); setTimeout(() => $('gate-in').focus(), 150); }
+  });
 })();
 </script>
 </body>
